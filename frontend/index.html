@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scheduler Maker AI Demo</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="app-shell" aria-label="Scheduler Maker AI Demo">
+        <header class="app-header">
+          <div>
+            <p class="eyebrow">Service Center Dispatch</p>
+            <h1>Scheduler Maker AI Demo</h1>
+          </div>
+          <span class="status-pill">Timeline ready</span>
+        </header>
+
+        <section class="scheduler-layout">
+          <div
+            id="scheduler_here"
+            class="dhx_cal_container scheduler-container"
+            aria-label="Technician appointment timeline"
+          >
+            <div class="dhx_cal_navline">
+              <div class="dhx_cal_prev_button">&nbsp;</div>
+              <div class="dhx_cal_next_button">&nbsp;</div>
+              <div class="dhx_cal_today_button"></div>
+              <div class="dhx_cal_date"></div>
+              <div class="dhx_cal_tab" data-tab="day"></div>
+              <div class="dhx_cal_tab" data-tab="week"></div>
+              <div class="dhx_cal_tab" data-tab="timeline"></div>
+            </div>
+            <div class="dhx_cal_header"></div>
+            <div class="dhx_cal_data"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
