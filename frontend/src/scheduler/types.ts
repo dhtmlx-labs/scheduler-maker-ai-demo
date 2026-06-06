@@ -39,3 +39,15 @@ export type UnscheduledItem = {
   priority: ScheduledItemPriority;
   estimated_minutes: number;
 };
+
+export type SchedulerState = {
+  scheduledItems: ScheduledItem[];
+  unscheduledItems: UnscheduledItem[];
+  resources: Resource[];
+};
+
+export type CommandResult<T = unknown> = {
+  ok: true;
+  cmd: string;
+  data: T;
+};

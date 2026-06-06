@@ -1,11 +1,35 @@
 import "./style.css";
 
-import { initIncomingRequestsPanel } from "./incoming-requests.ts";
-import { initSchedulerBoard } from "./scheduler/scheduler-board.ts";
-import { seedScheduledItems, seedUnscheduledItems } from "./scheduler/data.ts";
+import { appState } from "./app-state.ts";
+import { createCommandRunner } from "./command-runner.ts";
+import {
+  initIncomingRequestsPanel,
+  renderIncomingRequestsPanel,
+} from "./incoming-panel/incoming-requests.ts";
 
-const scheduledItems = [...seedScheduledItems];
-const unscheduledItems = [...seedUnscheduledItems];
+import {
+  getScheduledItemsFromScheduler,
+  initSchedulerBoard,
+  replaceScheduledItems,
+} from "./scheduler/scheduler-board.ts";
 
-initIncomingRequestsPanel(unscheduledItems);
-initSchedulerBoard(scheduledItems);
+import { wireSchedulerDropTarget } from "./scheduler/scheduler-dnd.ts";
+
+function refreshIncomingRequests(): void {
+  renderIncomingRequestsPanel(appState.unscheduledItems);
+}
+
+initIncomingRequestsPanel(() => appState.unscheduledItems);
+initSchedulerBoard(appState.scheduledItems);
+wireSchedulerDropTarget(refreshIncomingRequests);
+
+const runCommand = createCommandRunner({
+  state: appState,
+  scheduler: {
+    replaceScheduledItems,
+    getScheduledItemsFromScheduler,
+  },
+  renderIncomingRequests: refreshIncomingRequests,
+});
+
+Object.assign(window, { runSchedulerCommand: runCommand });

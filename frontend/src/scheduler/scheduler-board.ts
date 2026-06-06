@@ -2,6 +2,8 @@ import "@dhx/trial-scheduler/codebase/dhtmlxscheduler.css";
 
 import { scheduler } from "@dhx/trial-scheduler";
 
+import { formatSchedulerDate } from "./scheduler-utils.ts";
+
 import type { Resource, ScheduledItem } from "./types.ts";
 import { resources, seedScheduledItems } from "./data.ts";
 
@@ -45,12 +47,21 @@ function configureScheduler(): void {
   scheduler.config.date_format = "%Y-%m-%d %H:%i";
   // scheduler.templates.parse_date
 
-  scheduler.templates.event_class = (_start, _end, event: ScheduledItem) => appointmentClass(event);
+  scheduler.createTimelineView({
+    name: "timeline",
+    x_unit: "hour",
+    x_date: "%H:%i",
+    x_step: 1,
+    x_size: 11,
+    x_start: 8,
+    y_unit: resources,
+    y_property: "resource_id",
+    render: "bar",
+    event_dy: "full",
+    section_autoheight: true,
+  });
 
-  scheduler.templates.event_text = (_start, _end, event: ScheduledItem) => `
-    <div class="service-event__title">${escapeHtml(event.requester)} - ${escapeHtml(event.asset)}</div>
-    <div class="service-event__meta">${escapeHtml(event.work_type)} | ${escapeHtml(event.status.replace("_", " "))}</div>
-  `;
+  scheduler.templates.event_class = (_start, _end, event: ScheduledItem) => appointmentClass(event);
 
   scheduler.templates.event_bar_text = (_start, _end, event: ScheduledItem) => `
     <div class="service-event__title">${escapeHtml(event.requester)} - ${escapeHtml(event.asset)}</div>
@@ -65,20 +76,6 @@ function configureScheduler(): void {
       <em>${escapeHtml(event.work_type)} - ${escapeHtml(event.priority)} priority</em>
     </div>
   `;
-
-  scheduler.createTimelineView({
-    name: "timeline",
-    x_unit: "hour",
-    x_date: "%H:%i",
-    x_step: 1,
-    x_size: 11,
-    x_start: 8,
-    y_unit: resources,
-    y_property: "resource_id",
-    render: "bar",
-    event_dy: "full",
-    section_autoheight: true,
-  });
 
   scheduler.templates.timeline_scale_label = (_key, _label, section: Resource) => `
     <div class="resource-label">
@@ -102,5 +99,52 @@ export function initSchedulerBoard(scheduledItems: ScheduledItem[] = seedSchedul
   configureScheduler();
 
   scheduler.init("scheduler_here", demoDate, "timeline");
+  replaceScheduledItems(scheduledItems);
+}
+
+export function replaceScheduledItems(scheduledItems: ScheduledItem[]): void {
+  scheduler.clearAll();
   scheduler.parse(scheduledItems);
+}
+
+export function getScheduledItemsFromScheduler(): ScheduledItem[] {
+  return scheduler.getEvents().map((event) => ({
+    id: Number(event.id),
+    text: event.text,
+    start_date: event.start_date instanceof Date ? formatSchedulerDate(event.start_date) : event.start_date,
+    end_date: event.end_date instanceof Date ? formatSchedulerDate(event.end_date) : event.end_date,
+    resource_id: event.resource_id,
+    status: event.status,
+    priority: event.priority,
+    requester: event.requester,
+    location: event.location,
+    asset: event.asset,
+    issue: event.issue,
+    work_type: event.work_type,
+  }));
+}
+
+export function getDropTarget(event: DragEvent): { startDate: Date; resourceId: string } | null {
+  const target = event.target;
+
+  if (!(target instanceof HTMLElement)) {
+    return null;
+  }
+
+  const slot = target.closest(".dhx_scale_time_slot, .dhx_timeline_data_cell, .dhx_matrix_cell");
+
+  if (!slot) {
+    return null;
+  }
+
+  const actionData = scheduler.getActionData(event);
+
+  if (!actionData?.date || !actionData?.section) {
+    return null;
+  }
+
+  return {
+    startDate: actionData.date,
+    resourceId: String(actionData.section),
+  };
 }
