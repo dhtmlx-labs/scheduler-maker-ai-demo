@@ -2,8 +2,8 @@ import "@dhx/trial-scheduler/codebase/dhtmlxscheduler.css";
 
 import { scheduler } from "@dhx/trial-scheduler";
 
-import { seedScheduledItems, resources } from "./data.ts";
 import type { Resource, ScheduledItem } from "./types.ts";
+import { resources, seedScheduledItems } from "./data.ts";
 
 import "./scheduler.css";
 
@@ -81,7 +81,7 @@ function configureScheduler(): void {
   });
 
   scheduler.templates.timeline_scale_label = (_key, _label, section: Resource) => `
-    <div class="Resource-label">
+    <div class="resource-label">
       <strong>${escapeHtml(section.name)}</strong>
       <span>${escapeHtml(section.description)}</span>
     </div>
@@ -98,9 +98,9 @@ function configureScheduler(): void {
   };
 }
 
-export function initSchedulerBoard(): void {
+export function initSchedulerBoard(scheduledItems: ScheduledItem[] = seedScheduledItems): void {
   configureScheduler();
 
   scheduler.init("scheduler_here", demoDate, "timeline");
-  scheduler.parse(seedScheduledItems);
+  scheduler.parse(scheduledItems);
 }

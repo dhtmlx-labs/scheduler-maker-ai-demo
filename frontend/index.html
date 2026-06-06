@@ -8,32 +8,45 @@
   <body>
     <main id="app">
       <section class="app-shell" aria-label="Scheduler Maker AI Demo">
-        <header class="app-header">
-          <div>
-            <p class="eyebrow">Service Center Dispatch</p>
-            <h1>Scheduler Maker AI Demo</h1>
-          </div>
-          <span class="status-pill">Timeline ready</span>
-        </header>
-
-        <section class="scheduler-layout">
-          <div
-            id="scheduler_here"
-            class="dhx_cal_container scheduler-container"
-            aria-label="Technician appointment timeline"
+        <section class="workspace-layout">
+          <aside
+            id="incoming_requests_panel"
+            class="incoming-panel"
+            aria-label="Incoming requests"
           >
-            <div class="dhx_cal_navline">
-              <div class="dhx_cal_prev_button">&nbsp;</div>
-              <div class="dhx_cal_next_button">&nbsp;</div>
-              <div class="dhx_cal_today_button"></div>
-              <div class="dhx_cal_date"></div>
-              <div class="dhx_cal_tab" data-tab="day"></div>
-              <div class="dhx_cal_tab" data-tab="week"></div>
-              <div class="dhx_cal_tab" data-tab="timeline"></div>
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Intake</p>
+                <h2>Incoming Requests</h2>
+              </div>
+              <span id="incoming_requests_count" class="count-pill"></span>
             </div>
-            <div class="dhx_cal_header"></div>
-            <div class="dhx_cal_data"></div>
-          </div>
+            <div
+              id="incoming_requests_list"
+              class="incoming-list"
+              aria-label="Unscheduled service requests"
+            ></div>
+          </aside>
+
+          <section class="scheduler-layout" aria-label="Scheduled appointments">
+            <div
+              id="scheduler_here"
+              class="scheduler-container"
+              aria-label="Technician appointment timeline"
+            ></div>
+          </section>
+
+          <aside id="chat_panel" class="chat-panel" aria-label="AI dispatcher chat">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">AI Assistant</p>
+                <h2>Dispatch Chat</h2>
+              </div>
+            </div>
+            <div class="chat-placeholder">
+              <p>Chat connection will be added in a later step.</p>
+            </div>
+          </aside>
         </section>
       </section>
     </main>

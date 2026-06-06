@@ -29,15 +29,6 @@ body {
   padding: 18px;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin: 0;
-  min-height: 58px;
-}
-
 .eyebrow {
   margin: 0 0 6px;
   color: #506174;
@@ -47,16 +38,9 @@ body {
   text-transform: uppercase;
 }
 
-h1,
 h2,
 p {
   margin-top: 0;
-}
-
-h1 {
-  margin-bottom: 0;
-  font-size: 1.75rem;
-  line-height: 1.2;
 }
 
 h2 {
@@ -64,20 +48,17 @@ h2 {
   font-size: 1.35rem;
 }
 
-.status-pill {
-  flex: 0 0 auto;
-  border: 1px solid #bfd4c4;
-  border-radius: 999px;
-  background: #e8f7ed;
-  color: #1f6b3d;
-  font-size: 0.9rem;
-  font-weight: 700;
-  padding: 8px 12px;
+.workspace-layout {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(520px, 1fr) minmax(260px, 320px);
+  gap: 14px;
+  min-height: 0;
 }
 
+.incoming-panel,
+.chat-panel,
 .scheduler-layout {
-  flex: 1 1 auto;
-  min-height: 0;
   border: 1px solid #d4dde6;
   border-radius: 8px;
   background: #ffffff;
@@ -85,18 +66,176 @@ h2 {
   overflow: hidden;
 }
 
+.incoming-panel,
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e1e7ee;
+}
+
+.panel-header h2 {
+  margin-bottom: 0;
+  font-size: 1.02rem;
+  line-height: 1.2;
+}
+
+.count-pill {
+  flex: 0 0 auto;
+  border: 1px solid #d3dce6;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #506174;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 9px;
+}
+
+.incoming-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.incoming-card {
+  flex: 0 0 auto;
+  border: 1px solid #d8e0e8;
+  border-left: 4px solid #6d8198;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.incoming-card:hover {
+  border-color: #aab8c7;
+  box-shadow: 0 8px 20px rgba(33, 45, 62, 0.1);
+  cursor: grab;
+  transform: translateY(-1px);
+}
+
+.incoming-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.incoming-card__priority {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 7px;
+  text-transform: uppercase;
+}
+
+.incoming-card__priority--normal {
+  background: #e8eef4;
+  color: #41556c;
+}
+
+.incoming-card__priority--urgent {
+  background: #ffe7e7;
+  color: #b23434;
+}
+
+.incoming-card__duration {
+  color: #617184;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.incoming-card h3 {
+  margin: 0 0 6px;
+  color: #1e2b3d;
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
+.incoming-card p {
+  margin-bottom: 10px;
+  color: #506174;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.incoming-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.incoming-card dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.incoming-card dt {
+  color: #738194;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.incoming-card dd {
+  margin: 0;
+  color: #263548;
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.chat-placeholder {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #617184;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.scheduler-layout {
+  min-height: 0;
+}
+
 @media (max-width: 640px) {
   .app-shell {
     padding: 12px;
   }
 
-  .app-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
+  .workspace-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 28vh) minmax(420px, 56vh) minmax(220px, 28vh);
+    overflow: auto;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1180px) {
+  .workspace-layout {
+    grid-template-columns: minmax(220px, 280px) minmax(520px, 1fr);
+    grid-template-rows: minmax(430px, 1fr) minmax(220px, 30vh);
   }
 
-  h1 {
-    font-size: 1.35rem;
+  .chat-panel {
+    grid-column: 1 / -1;
   }
 }

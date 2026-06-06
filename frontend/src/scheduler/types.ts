@@ -26,4 +26,16 @@ export type ScheduledItem = {
   asset: string;
   issue: string;
   work_type: string;
-};  
+};
+
+export type UnscheduledItem = {
+  id: number;
+  text: string;
+  requester: string;
+  location: string;
+  asset: string;
+  issue: string;
+  work_type: string;
+  priority: ScheduledItemPriority;
+  estimated_minutes: number;
+};

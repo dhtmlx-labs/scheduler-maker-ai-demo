@@ -1,5 +1,5 @@
 
-import type { Resource, ScheduledItem } from "./types.ts";     
+import type { Resource, ScheduledItem, UnscheduledItem } from "./types.ts";
 
 export const resources: Resource[] = [
   {
@@ -140,5 +140,52 @@ export const seedScheduledItems: ScheduledItem[] = [
     work_type: "Electrical calibration",
     status: "ready",
     priority: "normal",
+  },
+];
+
+export const seedUnscheduledItems: UnscheduledItem[] = [
+  {
+    id: 101,
+    text: "Check engine light diagnostic",
+    requester: "Grace Kim",
+    location: "Intake",
+    asset: "2020 Mazda CX-5",
+    issue: "Warning light after highway driving",
+    work_type: "Diagnostics",
+    priority: "normal",
+    estimated_minutes: 90,
+  },
+  {
+    id: 102,
+    text: "Brake pedal soft",
+    requester: "Henry Adams",
+    location: "Intake",
+    asset: "2017 Honda CR-V",
+    issue: "Brake pedal feels soft in city traffic",
+    work_type: "Brake inspection",
+    priority: "urgent",
+    estimated_minutes: 120,
+  },
+  {
+    id: 103,
+    text: "Heated seat electrical fault",
+    requester: "Sophie Baker",
+    location: "Intake",
+    asset: "2022 Volvo XC60",
+    issue: "Driver seat heater stops after two minutes",
+    work_type: "Electrical",
+    priority: "normal",
+    estimated_minutes: 75,
+  },
+  {
+    id: 104,
+    text: "EV charging cable release",
+    requester: "Lucas Meyer",
+    location: "Intake",
+    asset: "2023 Nissan Ariya",
+    issue: "Charging cable lock does not release consistently",
+    work_type: "EV systems",
+    priority: "urgent",
+    estimated_minutes: 105,
   },
 ];
