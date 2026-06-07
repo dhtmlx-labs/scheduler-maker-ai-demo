@@ -8,7 +8,6 @@ import {
 } from "./incoming-panel/incoming-requests.ts";
 
 import {
-  getScheduledItemsFromScheduler,
   initSchedulerBoard,
   replaceScheduledItems,
 } from "./scheduler/scheduler-board.ts";
@@ -27,7 +26,6 @@ const runCommand = createCommandRunner({
   state: appState,
   scheduler: {
     replaceScheduledItems,
-    getScheduledItemsFromScheduler,
   },
   renderIncomingRequests: refreshIncomingRequests,
 });

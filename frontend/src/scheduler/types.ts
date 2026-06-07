@@ -13,8 +13,10 @@ export type ScheduledItemStatus =
 
 export type ScheduledItemPriority = "normal" | "urgent";
 
+export type SchedulerItemId = string | number;
+
 export type ScheduledItem = {
-  id: number;
+  id: SchedulerItemId;
   text: string;
   start_date: string;
   end_date: string;
@@ -29,7 +31,7 @@ export type ScheduledItem = {
 };
 
 export type UnscheduledItem = {
-  id: number;
+  id: SchedulerItemId;
   text: string;
   requester: string;
   location: string;

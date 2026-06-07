@@ -2,13 +2,13 @@ import type {
   CommandResult,
   Resource,
   ScheduledItem,
+  SchedulerItemId,
   SchedulerState,
   UnscheduledItem,
 } from "./scheduler/types.ts";
 
 type SchedulerController = {
   replaceScheduledItems: (items: ScheduledItem[]) => void;
-  getScheduledItemsFromScheduler: () => ScheduledItem[];
 };
 
 type SchedulerAppState = {
@@ -26,12 +26,12 @@ type CommandRunnerOptions = {
 type AddAppointmentArgs = ScheduledItem;
 
 type UpdateAppointmentsArgs = {
-  appointments: Array<Partial<ScheduledItem> & { id: number }>;
+  appointments: Array<Partial<ScheduledItem> & { id: SchedulerItemId }>;
 };
 
 type DeleteAppointmentsArgs = {
-  ids?: number[];
-  appointments?: Array<{ id: number }>;
+  ids?: SchedulerItemId[];
+  appointments?: Array<{ id: SchedulerItemId }>;
 };
 
 type GenerateScheduleArgs = {
@@ -77,8 +77,12 @@ function ensureAppointment(
   appointment: ScheduledItem,
   resources: Resource[],
 ): void {
-  if (!Number.isFinite(appointment.id)) {
-    throw new Error("Appointment id must be a number");
+  if (typeof appointment.id !== "string" && typeof appointment.id !== "number") {
+    throw new Error("Appointment id must be a string or number");
+  }
+
+  if (String(appointment.id).trim() === "") {
+    throw new Error("Appointment id is required");
   }
 
   if (!appointment.text?.trim()) {
@@ -92,10 +96,6 @@ function ensureAppointment(
   if (new Date(appointment.end_date.replace(" ", "T")) <= new Date(appointment.start_date.replace(" ", "T"))) {
     throw new Error("Appointment end_date must be after start_date");
   }
-}
-
-function normalizeSchedulerItems(options: CommandRunnerOptions): ScheduledItem[] {
-  return options.scheduler.getScheduledItemsFromScheduler().map((item) => ({ ...item }));
 }
 
 function syncScheduler(options: CommandRunnerOptions): SchedulerState {
@@ -115,8 +115,6 @@ function toResult<T>(cmd: string, data: T): CommandResult<T> {
 
 export function createCommandRunner(options: CommandRunnerOptions) {
   return function runCommand(cmd: string, args: CommandArgs = {}): CommandResult {
-    options.state.scheduledItems = normalizeSchedulerItems(options);
-
     switch (cmd) {
       case "get_scheduler_state":
         return toResult(cmd, cloneState(options.state));

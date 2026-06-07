@@ -93,8 +93,8 @@ export function initIncomingRequestsPanel(
       return;
     }
 
-    const requestId = Number(card.dataset.requestId);
-    const item = getItems().find((request) => request.id === requestId);
+    const requestId = card.dataset.requestId;
+    const item = getItems().find((request) => String(request.id) === requestId);
 
     if (!item) {
       return;
