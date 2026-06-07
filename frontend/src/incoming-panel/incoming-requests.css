@@ -25,7 +25,7 @@
   border-left: 4px solid #6d8198;
   border-radius: 8px;
   background: #ffffff;
-  padding: 12px;
+  padding: 10px 12px 2px;
   transition:
     border-color 0.16s ease,
     box-shadow 0.16s ease,
@@ -52,6 +52,27 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 9px;
+}
+
+.incoming-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.incoming-card__top h3 {
+  margin: 0;
+  flex: 1;
+  line-height: 1.25;
+}
+
+.incoming-card__badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .incoming-card__priority {
@@ -94,14 +115,14 @@
 }
 
 .incoming-card dl {
-  display: grid;
-  gap: 8px;
-  margin: 0;
+  margin: 6px 0;
 }
 
 .incoming-card dl div {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 2px 0;
 }
 
 .incoming-card dt {
@@ -110,6 +131,8 @@
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
+  flex: 0 0 40px;
+  margin: 0;
 }
 
 .incoming-card dd {

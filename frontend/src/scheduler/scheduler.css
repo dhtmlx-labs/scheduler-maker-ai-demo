@@ -26,9 +26,17 @@
 }
 
 .service-event {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  padding: 6px 8px;
+
   border-color: transparent;
   border-left: 4px solid #5d7999;
   border-radius: 4px;
+
   color: #ffffff;
   overflow: hidden;
 }
@@ -59,6 +67,7 @@
 }
 
 .service-event__title {
+  width: 100%;
   overflow: hidden;
   font-size: 0.78rem;
   font-weight: 700;
@@ -68,6 +77,7 @@
 }
 
 .service-event__meta {
+  width: 100%;
   overflow: hidden;
   margin-top: 3px;
   font-size: 0.72rem;

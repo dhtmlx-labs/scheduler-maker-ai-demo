@@ -33,14 +33,21 @@ function renderRequestCard(item: UnscheduledItem): string {
       data-request-id="${item.id}"
       data-estimated-minutes="${item.estimated_minutes}"
     >
-      <div class="incoming-card__header">
-        <span class="incoming-card__priority incoming-card__priority--${item.priority}">
-          ${escapeHtml(item.priority)}
-        </span>
-        <span class="incoming-card__duration">${formatDuration(item.estimated_minutes)}</span>
+      <div class="incoming-card__top">
+        <h3>${escapeHtml(item.text)}</h3>
+
+        <div class="incoming-card__badges">
+          <span class="incoming-card__priority incoming-card__priority--${item.priority}">
+            ${escapeHtml(item.priority)}
+          </span>
+
+          <span class="incoming-card__duration">
+            ${formatDuration(item.estimated_minutes)}
+          </span>
+        </div>
       </div>
-      <h3>${escapeHtml(item.text)}</h3>
-      <p>${escapeHtml(item.requester)} - ${escapeHtml(item.asset)}</p>
+
+      <p>${escapeHtml(item.asset)}</p>
       <dl>
         <div>
           <dt>Work</dt>

@@ -19,9 +19,9 @@ type InitChatOptions = {
 };
 
 const starterPrompts = [
-  "Generate today's schedule from pending repair requests.",
-  "Plan a balanced day with diagnostics, brake jobs, EV checks, and infotainment repairs.",
-  "Move the brake inspection later this afternoon.",
+  "Generate today's schedule from pending maintenance requests.",
+  "Plan a balanced day with HVAC, electrical, plumbing, and access control work.",
+  "Move the lobby access control work later this afternoon.",
 ];
 
 function isToolCallPayload(payload: unknown): payload is ToolCallPayload {
@@ -54,7 +54,7 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
       <div class="panel-header">
         <div>
           <p class="eyebrow">AI Assistant</p>
-          <h2>Dispatch Chat</h2>
+          <h2>Facilities Chat</h2>
         </div>
         <span id="chat_connection_status" class="chat-status">Connecting</span>
       </div>
@@ -69,7 +69,7 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
           .join("")}
       </div>
       <form id="chat_form" class="chat-form">
-        <input id="chat_input" class="chat-input" type="text" autocomplete="off" placeholder="Ask the dispatcher assistant..." />
+        <input id="chat_input" class="chat-input" type="text" autocomplete="off" placeholder="Ask the facilities assistant..." />
         <button id="chat_submit" class="chat-submit" type="submit">Send</button>
       </form>
     </div>
@@ -208,6 +208,6 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
 
   appendMessage(
     "assistant",
-    renderMarkdown("Ready when you are. I can help inspect the schedule, plan incoming requests, or adjust appointments."),
+    renderMarkdown("Ready when you are. I can help inspect the schedule, plan incoming maintenance requests, or adjust work orders."),
   );
 }

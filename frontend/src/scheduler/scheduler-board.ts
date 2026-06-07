@@ -95,8 +95,8 @@ function configureScheduler(): void {
   scheduler.templates.event_class = (_start, _end, event: ScheduledItem) => appointmentClass(event);
 
   scheduler.templates.event_bar_text = (_start, _end, event: ScheduledItem) => `
-    <div class="service-event__title">${escapeHtml(event.requester)} - ${escapeHtml(event.asset)}</div>
-    <div class="service-event__meta">${escapeHtml(event.work_type)} | ${escapeHtml((event.status ?? "scheduled").replace("_", " "))}</div>
+    <div class="service-event__title">${escapeHtml(event.asset)}</div>
+    <div class="service-event__meta">${escapeHtml(event.location)}</div>
   `;
 
   scheduler.templates.tooltip_text = (_start, _end, event: ScheduledItem) => `
