@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@dhx/trial-scheduler": "^7.2.4",
+    "dompurify": "^3.4.8",
+    "marked": "^18.0.5",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
