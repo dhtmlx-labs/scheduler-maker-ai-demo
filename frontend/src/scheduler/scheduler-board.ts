@@ -6,11 +6,9 @@ import { appState } from "../app-state.ts";
 import { formatSchedulerDate } from "./scheduler-utils.ts";
 
 import type { Resource, ScheduledItem, SchedulerItemId } from "./types.ts";
-import { resources, seedScheduledItems } from "./data.ts";
+import { demoDate, resources, seedScheduledItems } from "./data.ts";
 
 import "./scheduler.css";
-
-const demoDate = new Date(2026, 5, 5);
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -117,11 +115,15 @@ function configureScheduler(): void {
     </div>
   `;
 
-  scheduler.templates.timeline_cell_class = (_events, date, _section) => {
+  scheduler.templates.timeline_cell_class = (_events, date) => {
     const hour = date.getHours();
 
-    if (hour < 9 || hour === 12 || hour >= 18) {
+    if (hour < 9 || hour >= 18) {
       return "non_working_time";
+    }
+
+    if (hour === 12) {
+      return "lunch_time";
     }
 
     return "";

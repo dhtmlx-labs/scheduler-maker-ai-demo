@@ -190,6 +190,14 @@ ${SKIP_MESSAGE}
 - Keep final answers short, plain, and dispatcher-friendly.
 - Do not invent resource ids. Use resource ids from get_scheduler_state when availability matters.
 - Scheduled appointment dates must use YYYY-MM-DD HH:mm.
+- When the user asks to generate a schedule from pending requests, first call get_scheduler_state, then call generate_schedule with appointments created from unscheduledItems only.
+- For pending-request scheduling, do not regenerate, summarize, or include existing scheduledItems in generate_schedule arguments.
+- Existing scheduled appointments must remain unchanged unless the user explicitly asks to replace the entire schedule. Only then set replaceExisting: true.
+- For generate_schedule, keep new appointments inside 09:00-18:00. Lunch 12:00-13:00 pauses work; do not count it toward estimated_minutes.
+- Appointments may start before lunch and continue after lunch. For example, a 90-minute request starting at 11:30 should end at 14:00 because lunch does not count as working time.
+- Avoid end_date values inside lunch unless the appointment actually finishes before lunch begins.
+- When converting incoming requests into appointments, preserve each incoming request id as the scheduled appointment id so the frontend can remove used requests from Incoming Requests.
+- Prefer matching work_type to the resource specialization shown in get_scheduler_state.
 
 Today is ${new Date().toISOString().slice(0, 10)}.
 `;

@@ -9,7 +9,9 @@ const schedulerItemIdSchema = z.union([z.string().min(1), z.number()]).describe(
 const dateTimeSchema = z.string().regex(
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
   "Use YYYY-MM-DD HH:mm",
-).describe("Appointment date/time in Scheduler format, for example 2026-06-05 09:30.");
+).describe(
+  "Appointment date/time in Scheduler format YYYY-MM-DD HH:mm. Use the current date from the system prompt unless the user asks for another date. Use working hours 09:00-18:00. Lunch 12:00-13:00 pauses work and must not count toward estimated working duration.",
+);
 
 const resourceIdSchema = z.string().min(1).describe(
   "Scheduler Timeline resource id. For this demo use alex, nina, marek, or sofia.",
@@ -24,7 +26,15 @@ const appointmentStatusSchema = z.enum([
 
 const prioritySchema = z.enum(["normal", "urgent"]).describe("Request priority.");
 
-export const scheduledItemSchema = z.object({
+function parseSchedulerDate(value: string): Date {
+  return new Date(value.replace(" ", "T"));
+}
+
+function minutesOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+const scheduledItemObjectSchema = z.object({
   id: schedulerItemIdSchema,
   text: z.string().min(1).describe("Short appointment title shown in Scheduler."),
   start_date: dateTimeSchema,
@@ -39,10 +49,41 @@ export const scheduledItemSchema = z.object({
   work_type: z.string().min(1).describe("Type of work, such as EV diagnostic or brake inspection."),
 }).strict();
 
+export const scheduledItemSchema = scheduledItemObjectSchema.superRefine((item, context) => {
+  const start = parseSchedulerDate(item.start_date);
+  const end = parseSchedulerDate(item.end_date);
+  const startMinutes = minutesOfDay(start);
+  const endMinutes = minutesOfDay(end);
+
+  if (end <= start) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["end_date"],
+      message: "end_date must be after start_date",
+    });
+  }
+
+  if (start.toDateString() !== end.toDateString()) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["end_date"],
+      message: "appointments must start and end on the same day",
+    });
+  }
+
+  if (startMinutes < 9 * 60 || endMinutes > 18 * 60) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["start_date"],
+      message: "appointments must stay within working hours 09:00-18:00",
+    });
+  }
+});
+
 export const unscheduledItemSchema = z.object({
   id: schedulerItemIdSchema,
   text: z.string().min(1).describe("Short incoming request title."),
-  estimated_minutes: z.number().int().positive().describe("Estimated duration in minutes."),
+  estimated_minutes: z.number().int().positive().describe("Estimated working duration in minutes. Lunch 12:00-13:00 does not count toward this duration."),
   requester: z.string().min(1).describe("Person or account requesting the work."),
   location: z.string().optional().describe("Optional intake location or preferred work area."),
   asset: z.string().min(1).describe("Vehicle, equipment, or other serviced asset."),
@@ -53,18 +94,55 @@ export const unscheduledItemSchema = z.object({
 
 const generateScheduleSchema = z.object({
   unscheduledItems: z.array(unscheduledItemSchema).optional().describe(
-    "Incoming requests without assigned resource/time. They must not include resource_id, start_date, or end_date.",
+    "Pending incoming requests without assigned resource/time. Use these as the source items when the user asks to schedule pending requests. They must not include resource_id, start_date, or end_date.",
   ),
-  appointments: z.array(scheduledItemSchema).min(1).describe(
-    "Complete scheduled appointments to render in Scheduler.",
+  appointments: z.array(scheduledItemObjectSchema).min(1).describe(
+    "New scheduled appointments created from pending incoming requests. For pending-request scheduling, include ONLY newly generated appointments, never existing scheduled appointments. Each appointment id MUST equal the source unscheduled incoming request id. Calculate end_date from the request estimated_minutes; lunch 12:00-13:00 pauses work, so an appointment may span lunch and must be extended by lunch time.",
   ),
-}).strict();
+  allowLunchOverlap: z.boolean().optional().describe(
+    "Compatibility option. Lunch is treated as paused non-working time by default, so this is usually unnecessary.",
+  ),
+  replaceExisting: z.boolean().optional().describe(
+    "Default false. Set true only when the user explicitly asks to replace the entire existing schedule. For normal pending-request scheduling, omit this or set false so existing appointments remain unchanged.",
+  ),
+}).strict().superRefine((value, context) => {
+  value.appointments.forEach((item, index) => {
+    const start = parseSchedulerDate(item.start_date);
+    const end = parseSchedulerDate(item.end_date);
+    const startMinutes = minutesOfDay(start);
+    const endMinutes = minutesOfDay(end);
+
+    if (end <= start) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["appointments", index, "end_date"],
+        message: "end_date must be after start_date",
+      });
+    }
+
+    if (start.toDateString() !== end.toDateString()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["appointments", index, "end_date"],
+        message: "appointments must start and end on the same day",
+      });
+    }
+
+    if (startMinutes < 9 * 60 || endMinutes > 18 * 60) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["appointments", index, "start_date"],
+        message: "appointments must stay within working hours 09:00-18:00",
+      });
+    }
+  });
+});
 
 const addAppointmentSchema = scheduledItemSchema;
 
 const updateAppointmentsSchema = z.object({
   appointments: z.array(
-    scheduledItemSchema.partial().extend({
+    scheduledItemObjectSchema.partial().extend({
       id: schedulerItemIdSchema,
     }).strict(),
   ).min(1).describe("Existing appointments to update. Include id and only fields that should change."),
@@ -113,7 +191,7 @@ export type ToolArgumentsByName = {
 
 const toolDescriptions: Record<ToolName, string> = {
   generate_schedule:
-    "Generate or replace the visible Scheduler day from incoming unscheduled requests and scheduled appointments.",
+    "Schedule pending incoming requests into the existing Scheduler day. For normal pending-request scheduling, generate appointments only from unscheduledItems, preserve each incoming request id, do not include existing scheduled appointments, and do not replace the existing schedule unless replaceExisting is explicitly true.",
   add_appointment:
     "Create one scheduled appointment with assigned resource and start/end time.",
   update_appointments:

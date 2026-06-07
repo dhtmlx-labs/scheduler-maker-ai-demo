@@ -9,6 +9,7 @@ import type {
 import type { Socket } from "socket.io";
 import { ZodError } from "zod";
 import { MAX_MESSAGES, TOOL_TIMEOUT_MS } from "./constants.js";
+import { log } from "./logger.js";
 import { toolSchemasByName, type ToolName } from "./schemaList.js";
 import type { ChatMessages, ClientToolRequest, ClientToolResult } from "./types.js";
 
@@ -154,6 +155,8 @@ export async function executeToolCall({
 }): Promise<ClientToolResult> {
   const cmd = validateToolName(call.function.name);
   const params = validateToolArguments(cmd, parseToolArguments(call.function.arguments));
+
+  log.info("tool_call", cmd, params);
 
   return requestClientToolExecution(socket, {
     toolCallId: call.id,

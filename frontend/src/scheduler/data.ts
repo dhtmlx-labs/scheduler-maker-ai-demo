@@ -1,6 +1,20 @@
 
 import type { Resource, ScheduledItem, UnscheduledItem } from "./types.ts";
 
+export const demoDate = new Date();
+
+export function getDemoDateString(): string {
+  const year = demoDate.getFullYear();
+  const month = String(demoDate.getMonth() + 1).padStart(2, "0");
+  const day = String(demoDate.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export function toDemoDateTime(time: string): string {
+  return `${getDemoDateString()} ${time}`;
+}
+
 export const resources: Resource[] = [
   {
     key: "alex",
@@ -32,8 +46,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 1,
     text: "EV range diagnostic",
-    start_date: "2026-06-05 09:00",
-    end_date: "2026-06-05 10:30",
+    start_date: toDemoDateTime("09:00"),
+    end_date: toDemoDateTime("10:30"),
     resource_id: "alex",
     requester: "Emma Thompson",
     location: "Bay 1",
@@ -46,8 +60,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 2,
     text: "Brake vibration inspection",
-    start_date: "2026-06-05 09:30",
-    end_date: "2026-06-05 11:00",
+    start_date: toDemoDateTime("10:30"),
+    end_date: toDemoDateTime("12:00"),
     resource_id: "nina",
     requester: "Daniel Brooks",
     location: "Bay 2",
@@ -60,8 +74,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 3,
     text: "Oil leak and belt noise",
-    start_date: "2026-06-05 09:00",
-    end_date: "2026-06-05 11:30",
+    start_date: toDemoDateTime("09:00"),
+    end_date: toDemoDateTime("11:30"),
     resource_id: "marek",
     requester: "Olivia Martin",
     location: "Bay 3",
@@ -74,8 +88,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 4,
     text: "Infotainment reboot",
-    start_date: "2026-06-05 10:00",
-    end_date: "2026-06-05 11:30",
+    start_date: toDemoDateTime("10:00"),
+    end_date: toDemoDateTime("11:00"),
     resource_id: "sofia",
     requester: "Liam Chen",
     location: "Bay 4",
@@ -88,8 +102,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 5,
     text: "Suspension clunk",
-    start_date: "2026-06-05 13:00",
-    end_date: "2026-06-05 14:30",
+    start_date: toDemoDateTime("13:00"),
+    end_date: toDemoDateTime("14:30"),
     resource_id: "nina",
     requester: "Mia Gonzalez",
     location: "Bay 5",
@@ -102,8 +116,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 6,
     text: "Transmission hesitation",
-    start_date: "2026-06-05 13:00",
-    end_date: "2026-06-05 15:30",
+    start_date: toDemoDateTime("13:00"),
+    end_date: toDemoDateTime("15:30"),
     resource_id: "marek",
     requester: "Noah Williams",
     location: "Bay 6",
@@ -116,8 +130,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 7,
     text: "Charging port fault",
-    start_date: "2026-06-05 14:00",
-    end_date: "2026-06-05 16:00",
+    start_date: toDemoDateTime("14:00"),
+    end_date: toDemoDateTime("16:00"),
     resource_id: "alex",
     requester: "Ava Johnson",
     location: "Bay 7",
@@ -130,8 +144,8 @@ export const seedScheduledItems: ScheduledItem[] = [
   {
     id: 8,
     text: "ADAS camera calibration",
-    start_date: "2026-06-05 15:00",
-    end_date: "2026-06-05 17:00",
+    start_date: toDemoDateTime("15:00"),
+    end_date: toDemoDateTime("17:00"),
     resource_id: "sofia",
     requester: "Ethan Clark",
     location: "Bay 8",

@@ -87,6 +87,10 @@
   );
 }
 
+.lunch_time {
+  background: rgba(240, 185, 74, 0.12);
+}
+
 .service-tooltip {
   max-width: 260px;
   color: #1f2b3a;

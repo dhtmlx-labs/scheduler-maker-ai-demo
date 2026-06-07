@@ -19,8 +19,8 @@ type InitChatOptions = {
 };
 
 const starterPrompts = [
-  "Show me the current scheduler state.",
-  "Schedule the urgent incoming EV request with Alex.",
+  "Generate today's schedule from pending repair requests.",
+  "Plan a balanced day with diagnostics, brake jobs, EV checks, and infotainment repairs.",
   "Move the brake inspection later this afternoon.",
 ];
 
