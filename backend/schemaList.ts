@@ -27,7 +27,28 @@ const appointmentStatusSchema = z.enum([
 const prioritySchema = z.enum(["normal", "urgent"]).describe("Request priority.");
 
 function parseSchedulerDate(value: string): Date {
-  return new Date(value.replace(" ", "T"));
+  const match = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.exec(value);
+
+  if (!match) {
+    return new Date(Number.NaN);
+  }
+
+  const [datePart, timePart] = value.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hours, minutes] = timePart.split(":").map(Number);
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hours ||
+    date.getMinutes() !== minutes
+  ) {
+    return new Date(Number.NaN);
+  }
+
+  return date;
 }
 
 function minutesOfDay(date: Date): number {
@@ -54,6 +75,22 @@ export const scheduledItemSchema = scheduledItemObjectSchema.superRefine((item, 
   const end = parseSchedulerDate(item.end_date);
   const startMinutes = minutesOfDay(start);
   const endMinutes = minutesOfDay(end);
+
+  if (Number.isNaN(start.getTime())) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["start_date"],
+      message: "start_date must be a real calendar date/time",
+    });
+  }
+
+  if (Number.isNaN(end.getTime())) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["end_date"],
+      message: "end_date must be a real calendar date/time",
+    });
+  }
 
   if (end <= start) {
     context.addIssue({
@@ -112,6 +149,22 @@ const generateScheduleSchema = z.object({
     const startMinutes = minutesOfDay(start);
     const endMinutes = minutesOfDay(end);
 
+    if (Number.isNaN(start.getTime())) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["appointments", index, "start_date"],
+        message: "start_date must be a real calendar date/time",
+      });
+    }
+
+    if (Number.isNaN(end.getTime())) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["appointments", index, "end_date"],
+        message: "end_date must be a real calendar date/time",
+      });
+    }
+
     if (end <= start) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -149,8 +202,26 @@ const updateAppointmentsSchema = z.object({
 }).strict();
 
 const deleteAppointmentsSchema = z.object({
-  ids: z.array(schedulerItemIdSchema).min(1).describe("Scheduled work order ids to delete."),
-}).strict();
+  ids: z.array(schedulerItemIdSchema).min(1).optional().describe("Scheduled work order ids to delete."),
+  appointments: z.array(z.object({
+    id: schedulerItemIdSchema,
+  }).strict()).min(1).optional().describe("Alternative delete payload when the model has appointment objects with ids."),
+}).strict().refine((value) => Array.isArray(value.ids) || Array.isArray(value.appointments), {
+  message: "delete_appointments requires ids or appointments",
+});
+
+const unscheduleAppointmentsSchema = z.object({
+  ids: z.array(schedulerItemIdSchema).min(1).optional().describe(
+    "Scheduled work order ids to move back into Incoming Requests.",
+  ),
+  appointments: z.array(z.object({
+    id: schedulerItemIdSchema,
+  }).strict()).min(1).optional().describe(
+    "Alternative unschedule payload when the model has appointment objects with ids.",
+  ),
+}).strict().refine((value) => Array.isArray(value.ids) || Array.isArray(value.appointments), {
+  message: "unschedule_appointments requires ids or appointments",
+});
 
 const clearAllSchema = z.object({
   includeUnscheduled: z.boolean().optional().describe(
@@ -179,6 +250,7 @@ export const toolSchemasByName = {
   delete_appointments: deleteAppointmentsSchema,
   clear_all: clearAllSchema,
   get_scheduler_state: getSchedulerStateSchema,
+  unschedule_appointments: unscheduleAppointmentsSchema,
   set_view: setViewSchema,
   set_skin: setSkinSchema,
   set_zoom: setZoomSchema,
@@ -202,6 +274,8 @@ const toolDescriptions: Record<ToolName, string> = {
     "Clear scheduled maintenance work orders, optionally also clearing incoming unscheduled requests.",
   get_scheduler_state:
     "Return the current Scheduler state, including scheduled maintenance work orders, incoming requests, and resources.",
+  unschedule_appointments:
+    "Move one or more scheduled maintenance work orders back into Incoming Requests by id. Use this when the user asks to unschedule, unassign, or move a work order back to the request queue.",
   set_view:
     "Change the Scheduler view.",
   set_skin:

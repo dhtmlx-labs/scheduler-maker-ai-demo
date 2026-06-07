@@ -34,6 +34,11 @@ type DeleteAppointmentsArgs = {
   appointments?: Array<{ id: SchedulerItemId }>;
 };
 
+type UnscheduleAppointmentsArgs = {
+  ids?: SchedulerItemId[];
+  appointments?: Array<{ id: SchedulerItemId }>;
+};
+
 type GenerateScheduleArgs = {
   appointments?: ScheduledItem[];
   scheduledItems?: ScheduledItem[];
@@ -50,6 +55,7 @@ type CommandArgs =
   | AddAppointmentArgs
   | UpdateAppointmentsArgs
   | DeleteAppointmentsArgs
+  | UnscheduleAppointmentsArgs
   | GenerateScheduleArgs
   | ClearAllArgs
   | Record<string, never>;
@@ -74,14 +80,35 @@ function ensureResource(resources: Resource[], resourceId: string): void {
   }
 }
 
-function ensureDateString(value: string, field: string): void {
-  if (!datePattern.test(value) || Number.isNaN(new Date(value.replace(" ", "T")).getTime())) {
-    throw new Error(`Invalid ${field}: expected YYYY-MM-DD HH:mm`);
+function parseSchedulerDate(value: string): Date {
+  const match = datePattern.exec(value);
+
+  if (!match) {
+    return new Date(Number.NaN);
   }
+
+  const [datePart, timePart] = value.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hours, minutes] = timePart.split(":").map(Number);
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hours ||
+    date.getMinutes() !== minutes
+  ) {
+    return new Date(Number.NaN);
+  }
+
+  return date;
 }
 
-function parseSchedulerDate(value: string): Date {
-  return new Date(value.replace(" ", "T"));
+function ensureDateString(value: string, field: string): void {
+  if (!datePattern.test(value) || Number.isNaN(parseSchedulerDate(value).getTime())) {
+    throw new Error(`Invalid ${field}: expected YYYY-MM-DD HH:mm`);
+  }
 }
 
 function getMinutesOfDay(date: Date): number {
@@ -148,6 +175,17 @@ function normalizeGeneratedAppointmentEndDate(
   };
 }
 
+function calculateWorkingMinutes(startDate: Date, endDate: Date): number {
+  const startMinutes = getMinutesOfDay(startDate);
+  const endMinutes = getMinutesOfDay(endDate);
+  const lunchOverlapMinutes = Math.max(
+    0,
+    Math.min(endMinutes, lunchEndMinutes) - Math.max(startMinutes, lunchStartMinutes),
+  );
+
+  return Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000) - lunchOverlapMinutes);
+}
+
 function ensureAppointment(
   appointment: ScheduledItem,
   resources: Resource[],
@@ -187,6 +225,63 @@ function ensureAppointment(
   }
 }
 
+function ensureNoSameResourceOverlap(
+  appointment: ScheduledItem,
+  scheduledItems: ScheduledItem[],
+  options: { ignoreId?: SchedulerItemId } = {},
+): void {
+  const startDate = parseSchedulerDate(appointment.start_date);
+  const endDate = parseSchedulerDate(appointment.end_date);
+  const overlaps = scheduledItems.some((item) => {
+    if (options.ignoreId != null && item.id === options.ignoreId) {
+      return false;
+    }
+
+    if (item.resource_id !== appointment.resource_id) {
+      return false;
+    }
+
+    const itemStartDate = parseSchedulerDate(item.start_date);
+    const itemEndDate = parseSchedulerDate(item.end_date);
+
+    return startDate < itemEndDate && endDate > itemStartDate;
+  });
+
+  if (overlaps) {
+    throw new Error(`Appointment overlaps an existing work order for resource_id: ${appointment.resource_id}`);
+  }
+}
+
+function getIdsFromArgs(
+  args: DeleteAppointmentsArgs | UnscheduleAppointmentsArgs,
+  commandName: string,
+): SchedulerItemId[] {
+  const ids = args.ids ?? args.appointments?.map((appointment) => appointment.id);
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error(`${commandName} requires ids or appointments`);
+  }
+
+  return ids;
+}
+
+function createUnscheduledItemFromScheduledItem(item: ScheduledItem): UnscheduledItem {
+  const startDate = parseSchedulerDate(item.start_date);
+  const endDate = parseSchedulerDate(item.end_date);
+
+  return {
+    id: item.id,
+    text: item.text,
+    requester: item.requester,
+    location: item.location,
+    asset: item.asset,
+    issue: item.issue,
+    work_type: item.work_type,
+    priority: item.priority,
+    estimated_minutes: calculateWorkingMinutes(startDate, endDate),
+  };
+}
+
 function syncScheduler(options: CommandRunnerOptions): SchedulerState {
   options.scheduler.replaceScheduledItems(options.state.scheduledItems);
   options.renderIncomingRequests();
@@ -213,6 +308,7 @@ export function createCommandRunner(options: CommandRunnerOptions) {
       case "add_appointment": {
         const appointment = args as AddAppointmentArgs;
         ensureAppointment(appointment, options.state.resources);
+        ensureNoSameResourceOverlap(appointment, options.state.scheduledItems);
 
         if (options.state.scheduledItems.some((item) => item.id === appointment.id)) {
           throw new Error(`Appointment already exists: ${appointment.id}`);
@@ -242,6 +338,7 @@ export function createCommandRunner(options: CommandRunnerOptions) {
           };
 
           ensureAppointment(next, options.state.resources);
+          ensureNoSameResourceOverlap(next, options.state.scheduledItems, { ignoreId: patch.id });
           options.state.scheduledItems[index] = next;
         });
 
@@ -250,11 +347,7 @@ export function createCommandRunner(options: CommandRunnerOptions) {
 
       case "delete_appointments": {
         const deleteArgs = args as DeleteAppointmentsArgs;
-        const ids = deleteArgs.ids ?? deleteArgs.appointments?.map((appointment) => appointment.id);
-
-        if (!Array.isArray(ids)) {
-          throw new Error("delete_appointments requires ids or appointments");
-        }
+        const ids = getIdsFromArgs(deleteArgs, "delete_appointments");
 
         ids.forEach((id) => {
           if (!options.state.scheduledItems.some((item) => item.id === id)) {
@@ -265,6 +358,35 @@ export function createCommandRunner(options: CommandRunnerOptions) {
         options.state.scheduledItems = options.state.scheduledItems.filter(
           (item) => !ids.includes(item.id),
         );
+
+        return toResult(cmd, syncScheduler(options));
+      }
+
+      case "unschedule_appointments": {
+        const unscheduleArgs = args as UnscheduleAppointmentsArgs;
+        const ids = getIdsFromArgs(unscheduleArgs, "unschedule_appointments");
+        const idsToUnschedule = new Set(ids);
+        const restoredItems = ids.map((id) => {
+          const item = options.state.scheduledItems.find((scheduledItem) => scheduledItem.id === id);
+
+          if (!item) {
+            throw new Error(`Unknown appointment id: ${id}`);
+          }
+
+          if (options.state.unscheduledItems.some((unscheduledItem) => unscheduledItem.id === id)) {
+            throw new Error(`Incoming request already exists for appointment id: ${id}`);
+          }
+
+          return createUnscheduledItemFromScheduledItem(item);
+        });
+
+        options.state.scheduledItems = options.state.scheduledItems.filter(
+          (item) => !idsToUnschedule.has(item.id),
+        );
+        options.state.unscheduledItems = [
+          ...options.state.unscheduledItems.map((item) => ({ ...item })),
+          ...restoredItems,
+        ];
 
         return toResult(cmd, syncScheduler(options));
       }
@@ -312,7 +434,21 @@ export function createCommandRunner(options: CommandRunnerOptions) {
           });
         }
 
+        const nextScheduledItems = replaceExisting
+          ? normalizedAppointments
+          : [
+              ...options.state.scheduledItems,
+              ...normalizedAppointments,
+            ];
+
         normalizedAppointments.forEach((appointment) => ensureAppointment(appointment, options.state.resources));
+        nextScheduledItems.forEach((appointment) => {
+          ensureNoSameResourceOverlap(
+            appointment,
+            nextScheduledItems,
+            { ignoreId: appointment.id },
+          );
+        });
 
         const removedUnscheduledIds = options.state.unscheduledItems
           .filter((item) => scheduledIds.has(item.id))
@@ -322,12 +458,7 @@ export function createCommandRunner(options: CommandRunnerOptions) {
         console.info("[scheduler-tool] generate_schedule normalized appointments", normalizedAppointments);
         console.info("[scheduler-tool] generate_schedule removed unscheduled ids", removedUnscheduledIds);
 
-        options.state.scheduledItems = replaceExisting
-          ? normalizedAppointments.map((appointment) => ({ ...appointment }))
-          : [
-              ...options.state.scheduledItems.map((appointment) => ({ ...appointment })),
-              ...normalizedAppointments.map((appointment) => ({ ...appointment })),
-            ];
+        options.state.scheduledItems = nextScheduledItems.map((appointment) => ({ ...appointment }));
         options.state.unscheduledItems = options.state.unscheduledItems.filter(
           (item) => !scheduledIds.has(item.id),
         );

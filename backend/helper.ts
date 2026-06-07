@@ -225,9 +225,32 @@ function requestClientToolExecution(
         return;
       }
 
+      log.info("tool_result", summarizeToolResult(result));
       resolve(result);
     });
   });
+}
+
+function summarizeToolResult(result: ClientToolResult): Record<string, unknown> {
+  if (!result.ok) {
+    return {
+      ok: false,
+      cmd: result.cmd,
+      error: result.error,
+      toolCallId: result.toolCallId,
+    };
+  }
+
+  const data = result.data as { scheduledItems?: Array<{ id: unknown }>; unscheduledItems?: Array<{ id: unknown }> } | undefined;
+
+  return {
+    ok: true,
+    cmd: result.cmd,
+    summary: result.summary,
+    toolCallId: result.toolCallId,
+    scheduledIds: data?.scheduledItems?.map((item) => item.id),
+    unscheduledIds: data?.unscheduledItems?.map((item) => item.id),
+  };
 }
 
 function formatZodError(error: ZodError): string {

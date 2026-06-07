@@ -42,6 +42,47 @@ function renderMarkdown(value: string): string {
   return DOMPurify.sanitize(marked.parse(value, { async: false }) as string);
 }
 
+function extractIds(params: unknown): Array<string | number> {
+  if (!params || typeof params !== "object") {
+    return [];
+  }
+
+  const maybeParams = params as {
+    ids?: Array<string | number>;
+    appointments?: Array<{ id?: string | number }>;
+  };
+
+  return maybeParams.ids ?? maybeParams.appointments?.flatMap((item) => (
+    item.id == null ? [] : [item.id]
+  )) ?? [];
+}
+
+function summarizeToolResult(cmd: string, params: unknown, state: SchedulerState): string {
+  const scheduledIds = state.scheduledItems.map((item) => item.id).join(", ") || "none";
+  const unscheduledIds = state.unscheduledItems.map((item) => item.id).join(", ") || "none";
+
+  if (cmd === "delete_appointments") {
+    const deletedIds = extractIds(params).join(", ") || "unknown";
+
+    return [
+      `delete_appointments completed successfully. Deleted ids: ${deletedIds}.`,
+      `Current scheduled ids: ${scheduledIds}.`,
+      "Do not call delete_appointments again for the same ids unless the user explicitly asks for another delete.",
+    ].join(" ");
+  }
+
+  if (cmd === "unschedule_appointments") {
+    const restoredIds = extractIds(params).join(", ") || "unknown";
+
+    return [
+      `unschedule_appointments completed successfully. Restored incoming request ids: ${restoredIds}.`,
+      `Current scheduled ids: ${scheduledIds}. Current unscheduled ids: ${unscheduledIds}.`,
+    ].join(" ");
+  }
+
+  return `${cmd} completed successfully. Current scheduled ids: ${scheduledIds}. Current unscheduled ids: ${unscheduledIds}.`;
+}
+
 export function initChat({ socket, runCommand, getSchedulerState }: InitChatOptions): void {
   const container = document.querySelector<HTMLElement>("#chat_panel");
 
@@ -186,12 +227,15 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
 
     try {
       const result = runCommand(payload.cmd, payload.params);
-      console.log("getSchedulerState()", getSchedulerState());
+      const state = getSchedulerState();
+      const summary = summarizeToolResult(payload.cmd, payload.params, state);
+      console.info("[scheduler-tool-result]", summary);
       ack?.({
         ok: true,
         toolCallId: payload.toolCallId,
         cmd: payload.cmd,
-        data: getSchedulerState(),
+        summary,
+        data: state,
         result,
       });
     } catch (error) {

@@ -27,6 +27,7 @@ export type ClientToolResult =
       cmd: string;
       data?: unknown;
       result?: unknown;
+      summary?: string;
       toolCallId?: string;
     }
   | {
