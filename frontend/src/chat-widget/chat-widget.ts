@@ -186,9 +186,13 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
 
     try {
       const result = runCommand(payload.cmd, payload.params);
+      console.log("getSchedulerState()", getSchedulerState());
       ack?.({
-        ...result,
+        ok: true,
         toolCallId: payload.toolCallId,
+        cmd: payload.cmd,
+        data: getSchedulerState(),
+        result,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown tool error";
