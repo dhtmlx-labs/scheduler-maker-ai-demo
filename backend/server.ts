@@ -2,13 +2,27 @@ import "dotenv/config";
 
 import express, { type Express } from "express";
 import { createServer, type Server as HttpServer } from "http";
+import OpenAI from "openai";
 import { Server } from "socket.io";
-import { FRONTEND_ORIGIN, PORT } from "./constants.js";
+import { FRONTEND_ORIGIN, MAX_TURNS, MODEL, PORT, SKIP_MESSAGE } from "./constants.js";
+import {
+  executeToolCall,
+  getHistory,
+  getMessagesHistoryByClient,
+  saveMessage,
+  sessionMessagesByClient,
+  trimHistory,
+} from "./helper.js";
 import { log } from "./logger.js";
+import { schemaList } from "./schemaList.js";
 import type { AssistantMsgPayload, HealthResponse, UserMsgPayload } from "./types.js";
 
 const app: Express = express();
 const httpServer: HttpServer = createServer(app);
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL,
+});
 
 const io = new Server(httpServer, {
   cors: {
@@ -69,9 +83,68 @@ io.on("connection", (socket) => {
         return;
       }
 
+      getMessagesHistoryByClient(socket.id, generateSystemPrompt());
+      saveMessage(socket.id, { role: "user", content: message });
+
+      for (let turn = 0; turn < MAX_TURNS; turn += 1) {
+        const history = trimHistory(getHistory(socket.id));
+        const completion = await openai.chat.completions.create({
+          model: MODEL,
+          messages: history,
+          tools: schemaList,
+          tool_choice: "auto",
+        });
+        const assistantMessage = completion.choices[0]?.message;
+
+        if (!assistantMessage) {
+          throw new Error("OpenAI response did not include an assistant message");
+        }
+
+        if (!assistantMessage.tool_calls?.length) {
+          const response: AssistantMsgPayload = {
+            message: assistantMessage.content || SKIP_MESSAGE,
+          };
+
+          saveMessage(socket.id, {
+            role: "assistant",
+            content: response.message,
+          });
+          socket.emit("assistant_msg", response);
+          return;
+        }
+
+        saveMessage(socket.id, {
+          role: "assistant",
+          content: null,
+          tool_calls: assistantMessage.tool_calls,
+        });
+
+        for (const call of assistantMessage.tool_calls) {
+          try {
+            const result = await executeToolCall({ socket, call });
+            saveMessage(socket.id, {
+              role: "tool",
+              tool_call_id: call.id,
+              content: JSON.stringify(result),
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            saveMessage(socket.id, {
+              role: "tool",
+              tool_call_id: call.id,
+              content: JSON.stringify({
+                ok: false,
+                cmd: call.function.name,
+                error: errorMessage,
+              }),
+            });
+          }
+        }
+      }
+
       const response: AssistantMsgPayload = {
-        kind: "echo",
-        message: `Echo from Scheduler assistant: ${message}`,
+        kind: "error",
+        message: "Request required too many tool steps. Please try a simpler scheduling command.",
       };
 
       socket.emit("assistant_msg", response);
@@ -90,9 +163,37 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    sessionMessagesByClient.delete(socket.id);
     log.info(`Client disconnected: ${socket.id}`);
   });
 });
+
+function generateSystemPrompt(): string {
+  return `
+You are ServiceSchedulerAssistant.
+
+You help a service center dispatcher manage a DHTMLX Scheduler Timeline.
+The Scheduler contains scheduled appointments only. Incoming Requests are unscheduled items in a separate frontend-owned panel.
+
+Supported actions:
+- inspect current scheduler state
+- generate a schedule from incoming requests
+- add, update, or delete scheduled appointments
+- clear scheduled appointments
+- adjust Scheduler view, skin, or zoom
+
+Rules:
+- If a request depends on current appointments, incoming requests, resource rows, or technician availability, call get_scheduler_state first.
+- If a supported tool matches the request, call the tool instead of describing the action.
+- If the request is unsupported, answer exactly:
+${SKIP_MESSAGE}
+- Keep final answers short, plain, and dispatcher-friendly.
+- Do not invent resource ids. Use resource ids from get_scheduler_state when availability matters.
+- Scheduled appointment dates must use YYYY-MM-DD HH:mm.
+
+Today is ${new Date().toISOString().slice(0, 10)}.
+`;
+}
 
 httpServer.listen(PORT, () => {
   log.success(`Scheduler Maker AI Demo API running on :${PORT}`);
