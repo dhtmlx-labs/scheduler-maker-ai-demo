@@ -20,8 +20,11 @@ type InitChatOptions = {
 
 const starterPrompts = [
   "Generate today's schedule from pending maintenance requests.",
+  "Schedule all urgent requests first.",
   "Plan a balanced day with HVAC, electrical, plumbing, and access control work.",
   "Move the lobby access control work later this afternoon.",
+  "Change the Scheduler skin to dark.",
+  "Set the Timeline range to week.",
 ];
 
 function isToolCallPayload(payload: unknown): payload is ToolCallPayload {

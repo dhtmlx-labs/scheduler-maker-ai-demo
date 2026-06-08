@@ -23,7 +23,7 @@ const allowedSkins = new Set<SchedulerSkin>([
   "contrast-black",
 ]);
 
-let currentSkin: SchedulerSkin = "material";
+let currentSkin: SchedulerSkin = "terrace";
 
 const zoomConfigs: Record<SchedulerZoomLevel, {
   x_unit: "hour" | "day";
