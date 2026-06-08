@@ -10,6 +10,55 @@ import { demoDate, resources, seedScheduledItems } from "./data.ts";
 
 import "./scheduler.css";
 
+export type SchedulerZoomLevel = "day" | "3_days" | "week";
+export type SchedulerSkin = "material" | "flat" | "terrace" | "dark" | "contrast-white" | "contrast-black";
+export type SchedulerView = "timeline" | "day" | "week";
+
+const allowedSkins = new Set<SchedulerSkin>([
+  "material",
+  "flat",
+  "terrace",
+  "dark",
+  "contrast-white",
+  "contrast-black",
+]);
+
+let currentSkin: SchedulerSkin = "material";
+
+const zoomConfigs: Record<SchedulerZoomLevel, {
+  x_unit: "hour" | "day";
+  x_date: string;
+  x_step: number;
+  x_size: number;
+  x_start: number;
+  x_length: number;
+}> = {
+  day: {
+    x_unit: "hour",
+    x_date: "%H:%i",
+    x_step: 1,
+    x_size: 11,
+    x_start: 8,
+    x_length: 24,
+  },
+  "3_days": {
+    x_unit: "hour",
+    x_date: "%D %j<br>%H:%i",
+    x_step: 1,
+    x_size: 72,
+    x_start: 0,
+    x_length: 72,
+  },
+  week: {
+    x_unit: "day",
+    x_date: "%D %j",
+    x_step: 1,
+    x_size: 7,
+    x_start: 0,
+    x_length: 7,
+  },
+};
+
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -80,11 +129,7 @@ function configureScheduler(): void {
 
   scheduler.createTimelineView({
     name: "timeline",
-    x_unit: "hour",
-    x_date: "%H:%i",
-    x_step: 1,
-    x_size: 11,
-    x_start: 8,
+    ...zoomConfigs.day,
     y_unit: resources,
     y_property: "resource_id",
     render: "bar",
@@ -116,6 +161,13 @@ function configureScheduler(): void {
   `;
 
   scheduler.templates.timeline_cell_class = (_events, date) => {
+    const timeline = scheduler.getView("timeline");
+    const day = date.getDay();
+
+    if (timeline?.x_unit === "day") {
+      return day === 0 || day === 6 ? "non_working_time" : "";
+    }
+
     const hour = date.getHours();
 
     if (hour < 9 || hour >= 18) {
@@ -150,6 +202,7 @@ export function initSchedulerBoard(scheduledItems: ScheduledItem[] = seedSchedul
   configureScheduler();
 
   scheduler.init("scheduler_here", demoDate, "timeline");
+  scheduler.setSkin(currentSkin);
   configureDataProcessor();
   replaceScheduledItems(scheduledItems);
 }
@@ -161,6 +214,42 @@ export function replaceScheduledItems(scheduledItems: ScheduledItem[]): void {
 
 export function getScheduledItemsFromScheduler(): ScheduledItem[] {
   return scheduler.getEvents().map((event) => normalizeSchedulerEvent(event));
+}
+
+export function setSchedulerDate(date: Date): void {
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid Scheduler date");
+  }
+
+  scheduler.setCurrentView(date, scheduler.getState().mode);
+}
+
+export function setSchedulerView(view: SchedulerView): void {
+  if (!["timeline", "day", "week"].includes(view)) {
+    throw new Error(`Unsupported Scheduler view: ${view}`);
+  }
+
+  scheduler.setCurrentView(scheduler.getState().date, view);
+}
+
+export function setSchedulerSkin(skin: SchedulerSkin): void {
+  if (!allowedSkins.has(skin)) {
+    throw new Error(`Unsupported Scheduler skin: ${skin}`);
+  }
+
+  currentSkin = skin;
+  scheduler.setSkin(skin);
+}
+
+export function setSchedulerZoom(level: SchedulerZoomLevel): void {
+  const config = zoomConfigs[level];
+
+  if (!config) {
+    throw new Error(`Unsupported Scheduler zoom: ${level}`);
+  }
+
+  Object.assign(scheduler.matrix.timeline, config);
+  scheduler.setCurrentView(scheduler.getState().date, "timeline");
 }
 
 export function getDropTarget(event: DragEvent): { startDate: Date; resourceId: string } | null {

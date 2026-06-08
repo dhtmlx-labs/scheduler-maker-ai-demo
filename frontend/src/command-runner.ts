@@ -9,6 +9,10 @@ import type {
 
 type SchedulerController = {
   replaceScheduledItems: (items: ScheduledItem[]) => void;
+  setDate: (date: Date) => void;
+  setSkin: (skin: "material" | "flat" | "terrace" | "dark" | "contrast-white" | "contrast-black") => void;
+  setView: (view: "timeline" | "day" | "week") => void;
+  setZoom: (level: "day" | "3_days" | "week") => void;
 };
 
 type SchedulerAppState = {
@@ -51,6 +55,22 @@ type ClearAllArgs = {
   includeUnscheduled?: boolean;
 };
 
+type SetDateArgs = {
+  date: string;
+};
+
+type SetSkinArgs = {
+  skin: "material" | "flat" | "terrace" | "dark" | "contrast-white" | "contrast-black";
+};
+
+type SetViewArgs = {
+  view: "timeline" | "day" | "week";
+};
+
+type SetZoomArgs = {
+  level: "day" | "3_days" | "week";
+};
+
 type CommandArgs =
   | AddAppointmentArgs
   | UpdateAppointmentsArgs
@@ -58,6 +78,10 @@ type CommandArgs =
   | UnscheduleAppointmentsArgs
   | GenerateScheduleArgs
   | ClearAllArgs
+  | SetDateArgs
+  | SetSkinArgs
+  | SetViewArgs
+  | SetZoomArgs
   | Record<string, never>;
 
 const datePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
@@ -65,6 +89,7 @@ const workStartMinutes = 9 * 60;
 const lunchStartMinutes = 12 * 60;
 const lunchEndMinutes = 13 * 60;
 const workEndMinutes = 18 * 60;
+const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
 
 function cloneState(state: SchedulerAppState): SchedulerState {
   return {
@@ -109,6 +134,25 @@ function ensureDateString(value: string, field: string): void {
   if (!datePattern.test(value) || Number.isNaN(parseSchedulerDate(value).getTime())) {
     throw new Error(`Invalid ${field}: expected YYYY-MM-DD HH:mm`);
   }
+}
+
+function parseDateOnly(value: string): Date {
+  if (!dateOnlyPattern.test(value)) {
+    return new Date(Number.NaN);
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return new Date(Number.NaN);
+  }
+
+  return date;
 }
 
 function getMinutesOfDay(date: Date): number {
@@ -476,6 +520,36 @@ export function createCommandRunner(options: CommandRunnerOptions) {
         }
 
         return toResult(cmd, syncScheduler(options));
+      }
+
+      case "set_date": {
+        const { date } = args as SetDateArgs;
+        const nextDate = parseDateOnly(date);
+
+        if (Number.isNaN(nextDate.getTime())) {
+          throw new Error("set_date requires a valid YYYY-MM-DD date");
+        }
+
+        options.scheduler.setDate(nextDate);
+        return toResult(cmd, cloneState(options.state));
+      }
+
+      case "set_skin": {
+        const { skin } = args as SetSkinArgs;
+        options.scheduler.setSkin(skin);
+        return toResult(cmd, cloneState(options.state));
+      }
+
+      case "set_view": {
+        const { view } = args as SetViewArgs;
+        options.scheduler.setView(view);
+        return toResult(cmd, cloneState(options.state));
+      }
+
+      case "set_zoom": {
+        const { level } = args as SetZoomArgs;
+        options.scheduler.setZoom(level);
+        return toResult(cmd, cloneState(options.state));
       }
 
       default:

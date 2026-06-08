@@ -236,11 +236,26 @@ const setViewSchema = z.object({
 }).strict();
 
 const setSkinSchema = z.object({
-  skin: z.string().min(1).describe("DHTMLX Scheduler skin name."),
+  skin: z.enum([
+    "material",
+    "flat",
+    "terrace",
+    "dark",
+    "contrast-white",
+    "contrast-black",
+  ]).describe("Allowed DHTMLX Scheduler skin name."),
 }).strict();
 
 const setZoomSchema = z.object({
-  level: z.enum(["compact", "normal", "detailed"]).describe("Timeline zoom density."),
+  level: z.enum(["day", "3_days", "week"]).describe(
+    "Timeline zoom range. day shows one day with hourly scale, 3_days shows three days with hourly scale, week shows seven day columns.",
+  ),
+}).strict();
+
+const setDateSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").describe(
+    "Scheduler date to display in YYYY-MM-DD format.",
+  ),
 }).strict();
 
 export const toolSchemasByName = {
@@ -254,6 +269,7 @@ export const toolSchemasByName = {
   set_view: setViewSchema,
   set_skin: setSkinSchema,
   set_zoom: setZoomSchema,
+  set_date: setDateSchema,
 } as const;
 
 export type ToolName = keyof typeof toolSchemasByName;
@@ -281,7 +297,9 @@ const toolDescriptions: Record<ToolName, string> = {
   set_skin:
     "Change the DHTMLX Scheduler skin.",
   set_zoom:
-    "Change the Scheduler Timeline zoom density.",
+    "Change the Scheduler Timeline zoom range without modifying scheduled or incoming items.",
+  set_date:
+    "Jump the Scheduler to a specific date without modifying scheduled or incoming items.",
 };
 
 function toToolDefinition(name: ToolName): ChatCompletionTool {

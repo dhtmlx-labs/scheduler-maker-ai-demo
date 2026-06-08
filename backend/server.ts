@@ -181,7 +181,7 @@ Supported actions:
 - add, update, or delete scheduled maintenance work orders
 - move scheduled maintenance work orders back into Incoming Requests
 - clear scheduled maintenance work orders
-- adjust Scheduler view, skin, or zoom
+- adjust Scheduler view, skin, zoom, or visible date
 
 Rules:
 - If a request depends on current work orders, incoming requests, resource rows, or maintenance staff availability, call get_scheduler_state first.
@@ -192,6 +192,8 @@ ${SKIP_MESSAGE}
 - Keep final answers short, plain, and facilities-team friendly.
 - Do not invent resource ids. Use resource ids from get_scheduler_state when availability matters.
 - Scheduled work order dates must use YYYY-MM-DD HH:mm.
+- Use set_date for requests to jump to a calendar date. Use set_zoom for day, 3-day, or week timeline range requests. Use set_skin only with allowed skin names.
+- Scheduler view, skin, zoom, and date controls must not modify scheduledItems or unscheduledItems.
 - For add, update, delete, or unschedule requests that identify work orders by requester, asset, location, resource, time, or work type instead of explicit id, call get_scheduler_state first and use exact ids.
 - After a successful delete_appointments result, treat the listed deleted ids as already deleted. Do not call delete_appointments again for those ids unless the user explicitly asks for another delete.
 - When the user asks to generate a schedule from pending requests, first call get_scheduler_state, then call generate_schedule with work orders created from unscheduledItems only.

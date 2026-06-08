@@ -13,6 +13,10 @@ import {
 import {
   initSchedulerBoard,
   replaceScheduledItems,
+  setSchedulerDate,
+  setSchedulerSkin,
+  setSchedulerView,
+  setSchedulerZoom,
 } from "./scheduler/scheduler-board.ts";
 import type { SchedulerState } from "./scheduler/types.ts";
 
@@ -30,6 +34,10 @@ const runCommand = createCommandRunner({
   state: appState,
   scheduler: {
     replaceScheduledItems,
+    setDate: setSchedulerDate,
+    setSkin: setSchedulerSkin,
+    setView: setSchedulerView,
+    setZoom: setSchedulerZoom,
   },
   renderIncomingRequests: refreshIncomingRequests,
 });

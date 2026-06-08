@@ -61,6 +61,18 @@ function summarizeToolResult(cmd: string, params: unknown, state: SchedulerState
   const scheduledIds = state.scheduledItems.map((item) => item.id).join(", ") || "none";
   const unscheduledIds = state.unscheduledItems.map((item) => item.id).join(", ") || "none";
 
+  if (cmd === "set_zoom") {
+    return "set_zoom completed successfully. Confirm the Timeline range change briefly. Do not list scheduled or unscheduled items.";
+  }
+
+  if (cmd === "set_date") {
+    return "set_date completed successfully. Confirm the date change briefly. Do not list scheduled or unscheduled items.";
+  }
+
+  if (cmd === "set_skin") {
+    return "set_skin completed successfully. Confirm the skin change briefly. Do not list scheduled or unscheduled items.";
+  }
+
   if (cmd === "delete_appointments") {
     const deletedIds = extractIds(params).join(", ") || "unknown";
 
