@@ -18,6 +18,45 @@ type InitChatOptions = {
   getSchedulerState: () => SchedulerState;
 };
 
+type BrowserSpeechRecognitionEvent = Event & {
+  results: {
+    length: number;
+    [index: number]: {
+      length: number;
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
+};
+
+type BrowserSpeechRecognitionErrorEvent = Event & {
+  error?: string;
+};
+
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  abort: () => void;
+  start: () => void;
+  stop: () => void;
+  onend: (() => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onstart: (() => void) | null;
+};
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  }
+}
+
 const starterPrompts = [
   "Generate today's schedule from pending maintenance requests.",
   "Schedule all urgent requests first.",
@@ -43,6 +82,10 @@ function sanitizeText(value: string): string {
 
 function renderMarkdown(value: string): string {
   return DOMPurify.sanitize(marked.parse(value, { async: false }) as string);
+}
+
+function getSpeechRecognitionConstructor(): BrowserSpeechRecognitionConstructor | undefined {
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition;
 }
 
 function extractIds(params: unknown): Array<string | number> {
@@ -126,8 +169,10 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
       </div>
       <form id="chat_form" class="chat-form">
         <input id="chat_input" class="chat-input" type="text" autocomplete="off" placeholder="Ask the facilities assistant..." />
+        <button id="chat_voice" class="chat-voice" type="button" aria-label="Dictate message" title="Dictate message">Mic</button>
         <button id="chat_submit" class="chat-submit" type="submit">Send</button>
       </form>
+      <div id="chat_voice_status" class="chat-voice-status" aria-live="polite"></div>
     </div>
   `;
 
@@ -136,10 +181,12 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
   const loader = container.querySelector<HTMLElement>("#chat_loader");
   const form = container.querySelector<HTMLFormElement>("#chat_form");
   const input = container.querySelector<HTMLInputElement>("#chat_input");
+  const voice = container.querySelector<HTMLButtonElement>("#chat_voice");
+  const voiceStatus = container.querySelector<HTMLElement>("#chat_voice_status");
   const submit = container.querySelector<HTMLButtonElement>("#chat_submit");
   const promptButtons = Array.from(container.querySelectorAll<HTMLButtonElement>(".prompt-pill"));
 
-  if (!messages || !loader || !form || !input || !submit) {
+  if (!messages || !loader || !form || !input || !submit || !voice || !voiceStatus) {
     return;
   }
 
@@ -147,16 +194,34 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
   const chatLoader = loader;
   const chatInput = input;
   const chatSubmit = submit;
+  const chatVoice = voice;
+  const chatVoiceStatus = voiceStatus;
+  const SpeechRecognition = getSpeechRecognitionConstructor();
   let pending = false;
+  let listening = false;
+  let recognition: BrowserSpeechRecognition | null = null;
 
   function setPending(nextPending: boolean): void {
     pending = nextPending;
     chatInput.disabled = nextPending;
     chatSubmit.disabled = nextPending;
+    chatVoice.disabled = nextPending || listening;
     promptButtons.forEach((button) => {
       button.disabled = nextPending;
     });
     chatLoader.hidden = !nextPending;
+  }
+
+  function setListening(nextListening: boolean): void {
+    listening = nextListening;
+    chatVoice.disabled = pending || nextListening;
+    chatVoice.classList.toggle("chat-voice--listening", nextListening);
+    chatVoice.textContent = nextListening ? "Listening" : "Mic";
+  }
+
+  function setVoiceStatus(message: string): void {
+    chatVoiceStatus.textContent = message;
+    chatVoiceStatus.hidden = message.length === 0;
   }
 
   function setStatus(label: string, connected: boolean): void {
@@ -196,9 +261,69 @@ export function initChat({ socket, runCommand, getSchedulerState }: InitChatOpti
     });
   }
 
+  function startVoiceInput(): void {
+    if (pending || listening) {
+      return;
+    }
+
+    if (!SpeechRecognition) {
+      setVoiceStatus("Voice input is not supported in this browser. Typed chat still works.");
+      return;
+    }
+
+    recognition?.abort();
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = navigator.language || "en-US";
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setListening(true);
+      setVoiceStatus("Listening. Speak a command, then review it before sending.");
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from({ length: event.results.length })
+        .map((_, index) => event.results[index]?.[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+
+      if (!transcript) {
+        setVoiceStatus("No speech was recognized. You can try again or type the command.");
+        return;
+      }
+
+      chatInput.value = transcript;
+      chatInput.focus();
+      setVoiceStatus("Transcript added. Review or edit it, then send manually.");
+    };
+
+    recognition.onerror = (event) => {
+      const reason = event.error ? ` (${event.error})` : "";
+      setVoiceStatus(`Voice input stopped${reason}. Typed chat still works.`);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      setListening(false);
+      const message = error instanceof Error ? error.message : "Could not start voice input.";
+      setVoiceStatus(message);
+    }
+  }
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     sendUserMessage(chatInput.value);
+  });
+
+  chatVoice.addEventListener("click", () => {
+    startVoiceInput();
   });
 
   promptButtons.forEach((button) => {
