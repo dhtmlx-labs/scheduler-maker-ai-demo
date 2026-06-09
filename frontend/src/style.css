@@ -118,7 +118,7 @@ h2 {
 @media (min-width: 641px) and (max-width: 1180px) {
   .workspace-layout {
     grid-template-columns: minmax(220px, 280px) minmax(520px, 1fr);
-    grid-template-rows: minmax(430px, 1fr) minmax(220px, 30vh);
+    grid-template-rows: minmax(430px, 1fr) minmax(360px, 36vh);
   }
 
   .chat-panel {

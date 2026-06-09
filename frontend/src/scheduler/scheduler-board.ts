@@ -7,6 +7,7 @@ import { formatSchedulerDate } from "./scheduler-utils.ts";
 
 import type { Resource, ScheduledItem, SchedulerItemId } from "./types.ts";
 import { demoDate, resources, seedScheduledItems } from "./data.ts";
+import type { ScheduledPreviewItem } from "../preview/preview-session.ts";
 
 import "./scheduler.css";
 
@@ -24,6 +25,9 @@ const allowedSkins = new Set<SchedulerSkin>([
 ]);
 
 let currentSkin: SchedulerSkin = "terrace";
+let schedulerPreviewMode = false;
+let schedulerAiPendingMode = false;
+let replacingScheduledItems = false;
 
 const zoomConfigs: Record<SchedulerZoomLevel, {
   x_unit: "hour" | "day";
@@ -68,11 +72,30 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-function appointmentClass(event: ScheduledItem): string {
+function getPreviewLabel(event: ScheduledPreviewItem): string {
+  switch (event.preview_kind) {
+    case "existing":
+      return "Existing";
+    case "proposed_new":
+      return "Proposed";
+    case "old_position":
+      return "Old time";
+    case "proposed_moved":
+      return "New time";
+    case "proposed_deleted":
+      return "Removing";
+    default:
+      return "";
+  }
+}
+
+function appointmentClass(event: ScheduledPreviewItem): string {
   return [
     "service-event",
     `service-event--${event.status}`,
     event.priority === "urgent" ? "service-event--urgent" : "",
+    event.preview_kind ? "service-event--preview" : "",
+    event.preview_kind ? `service-event--preview-${event.preview_kind}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -115,6 +138,7 @@ function configureScheduler(): void {
     timeline: true,
     limit: true,
     tooltip: true,
+    readonly: true,
   });
 
   scheduler.config.header = [
@@ -137,15 +161,17 @@ function configureScheduler(): void {
     section_autoheight: true,
   });
 
-  scheduler.templates.event_class = (_start, _end, event: ScheduledItem) => appointmentClass(event);
+  scheduler.templates.event_class = (_start, _end, event: ScheduledPreviewItem) => appointmentClass(event);
 
-  scheduler.templates.event_bar_text = (_start, _end, event: ScheduledItem) => `
+  scheduler.templates.event_bar_text = (_start, _end, event: ScheduledPreviewItem) => `
     <div class="service-event__title">${escapeHtml(event.asset)}</div>
     <div class="service-event__meta">${escapeHtml(event.location)}</div>
+    ${event.preview_kind ? `<div class="service-event__preview-label">${escapeHtml(getPreviewLabel(event))}</div>` : ""}
   `;
 
-  scheduler.templates.tooltip_text = (_start, _end, event: ScheduledItem) => `
+  scheduler.templates.tooltip_text = (_start, _end, event: ScheduledPreviewItem) => `
     <div class="service-tooltip">
+      ${event.preview_kind ? `<strong>${escapeHtml(getPreviewLabel(event))}</strong><br />` : ""}
       <strong>${escapeHtml(event.requester)}</strong><br />
       ${escapeHtml(event.asset)}<br />
       <span>${escapeHtml(event.issue)}</span><br />
@@ -184,6 +210,18 @@ function configureScheduler(): void {
 
 function configureDataProcessor(): void {
   scheduler.createDataProcessor((_entity: string, action: string, data: any, id: string | number) => {
+    if (schedulerPreviewMode || schedulerAiPendingMode || replacingScheduledItems) {
+      console.info("[scheduler-lock] ignored Scheduler DataProcessor write", {
+        action,
+        id,
+        preview: schedulerPreviewMode,
+        aiPending: schedulerAiPendingMode,
+        replacing: replacingScheduledItems,
+      });
+
+      return Promise.resolve({ action: "updated", tid: data?.id ?? id });
+    }
+
     if (action === "delete") {
       removeScheduledItem(id);
       return Promise.resolve({ action: "deleted", tid: id });
@@ -208,8 +246,14 @@ export function initSchedulerBoard(scheduledItems: ScheduledItem[] = seedSchedul
 }
 
 export function replaceScheduledItems(scheduledItems: ScheduledItem[]): void {
-  scheduler.clearAll();
-  scheduler.parse(scheduledItems.map((item) => ({ ...item })));
+  replacingScheduledItems = true;
+
+  try {
+    scheduler.clearAll();
+    scheduler.parse(scheduledItems.map((item) => ({ ...item })));
+  } finally {
+    replacingScheduledItems = false;
+  }
 }
 
 export function getScheduledItemsFromScheduler(): ScheduledItem[] {
@@ -250,6 +294,17 @@ export function setSchedulerZoom(level: SchedulerZoomLevel): void {
 
   Object.assign(scheduler.matrix.timeline, config);
   scheduler.setCurrentView(scheduler.getState().date, "timeline");
+}
+
+export function setSchedulerPreviewMode(active: boolean): void {
+  schedulerPreviewMode = active;
+  schedulerAiPendingMode = false;
+  scheduler.config.readonly = active;
+}
+
+export function setSchedulerReadOnly(active: boolean): void {
+  schedulerAiPendingMode = active && !schedulerPreviewMode;
+  scheduler.config.readonly = active;
 }
 
 export function getDropTarget(event: DragEvent): { startDate: Date; resourceId: string } | null {

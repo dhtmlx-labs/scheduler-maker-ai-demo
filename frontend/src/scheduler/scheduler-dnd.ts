@@ -7,7 +7,10 @@ import {
 import type { UnscheduledItem } from "./types.ts";
 import { createScheduledItemFromRequest } from "./scheduler-utils.ts";
 
-export function wireSchedulerDropTarget(renderIncomingRequests: () => void): void {
+export function wireSchedulerDropTarget(
+  renderIncomingRequests: () => void,
+  options: { isDisabled?: () => boolean } = {},
+): void {
   const schedulerElement = document.querySelector<HTMLElement>("#scheduler_here");
 
   if (!schedulerElement) {
@@ -15,6 +18,13 @@ export function wireSchedulerDropTarget(renderIncomingRequests: () => void): voi
   }
 
   schedulerElement.addEventListener("dragover", (event) => {
+    if (options.isDisabled?.()) {
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "none";
+      }
+      return;
+    }
+
     if (!getDropTarget(event)) {
       return;
     }
@@ -27,6 +37,11 @@ export function wireSchedulerDropTarget(renderIncomingRequests: () => void): voi
   });
 
   schedulerElement.addEventListener("drop", (event) => {
+    if (options.isDisabled?.()) {
+      event.preventDefault();
+      return;
+    }
+
     const target = getDropTarget(event);
     const json = event.dataTransfer?.getData("application/json");
 

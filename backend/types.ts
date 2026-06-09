@@ -7,16 +7,30 @@ export type HealthResponse = {
 
 export type UserMsgPayload = {
   message: string;
+  requestId?: string;
   state?: unknown;
+};
+
+export type CancelRequestPayload = {
+  requestId: string;
+};
+
+export type SchedulerStateEventPayload = {
+  type: "preview_applied" | "preview_canceled";
+  state?: unknown;
+  scheduledIds?: Array<string | number>;
+  unscheduledIds?: Array<string | number>;
 };
 
 export type AssistantMsgPayload = {
   message: string;
   kind?: "echo" | "error" | "busy";
+  requestId?: string;
 };
 
 export type ClientToolRequest = {
   toolCallId: string;
+  requestId?: string;
   cmd: string;
   params: unknown;
 };

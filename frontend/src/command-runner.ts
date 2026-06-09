@@ -1,4 +1,5 @@
 import type {
+  AvailabilityResult,
   CommandResult,
   Resource,
   ScheduledItem,
@@ -71,6 +72,13 @@ type SetZoomArgs = {
   level: "day" | "3_days" | "week";
 };
 
+type GetAvailabilityWindowsArgs = {
+  date: string;
+  estimated_minutes?: number;
+  resource_ids?: string[];
+  work_type?: string;
+};
+
 type CommandArgs =
   | AddAppointmentArgs
   | UpdateAppointmentsArgs
@@ -82,6 +90,7 @@ type CommandArgs =
   | SetSkinArgs
   | SetViewArgs
   | SetZoomArgs
+  | GetAvailabilityWindowsArgs
   | Record<string, never>;
 
 const datePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
@@ -99,8 +108,37 @@ function cloneState(state: SchedulerAppState): SchedulerState {
   };
 }
 
-function ensureResource(resources: Resource[], resourceId: string): void {
+function summarizeState(state: SchedulerAppState): Record<string, unknown> {
+  return {
+    scheduledItems: state.scheduledItems.map((item) => ({
+      id: item.id,
+      resource_id: item.resource_id,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      text: item.text,
+    })),
+    unscheduledItems: state.unscheduledItems.map((item) => ({
+      id: item.id,
+      priority: item.priority,
+      estimated_minutes: item.estimated_minutes,
+      text: item.text,
+      work_type: item.work_type,
+    })),
+    resources: state.resources.map((resource) => ({
+      key: resource.key,
+      name: resource.name,
+      description: resource.description,
+    })),
+  };
+}
+
+function ensureResource(resources: Resource[], resourceId: string, appointment?: ScheduledItem): void {
   if (!resources.some((resource) => resource.key === resourceId)) {
+    console.warn("[scheduler-diagnostics] validation failed: unknown resource_id", {
+      resourceId,
+      allowedResourceIds: resources.map((resource) => resource.key),
+      appointment,
+    });
     throw new Error(`Unknown resource_id: ${resourceId}`);
   }
 }
@@ -220,6 +258,10 @@ function normalizeGeneratedAppointmentEndDate(
 }
 
 function calculateWorkingMinutes(startDate: Date, endDate: Date): number {
+  return Math.max(1, calculateExactWorkingMinutes(startDate, endDate));
+}
+
+function calculateExactWorkingMinutes(startDate: Date, endDate: Date): number {
   const startMinutes = getMinutesOfDay(startDate);
   const endMinutes = getMinutesOfDay(endDate);
   const lunchOverlapMinutes = Math.max(
@@ -227,7 +269,111 @@ function calculateWorkingMinutes(startDate: Date, endDate: Date): number {
     Math.min(endMinutes, lunchEndMinutes) - Math.max(startMinutes, lunchStartMinutes),
   );
 
-  return Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000) - lunchOverlapMinutes);
+  return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000) - lunchOverlapMinutes);
+}
+
+function getElapsedMinutes(startDate: Date, endDate: Date): number {
+  return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+}
+
+function getDatePart(value: string): string {
+  return value.split(" ")[0] ?? "";
+}
+
+function buildAvailabilityWindows(
+  state: SchedulerAppState,
+  args: GetAvailabilityWindowsArgs,
+): AvailabilityResult {
+  const date = parseDateOnly(args.date);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("get_availability_windows requires a valid YYYY-MM-DD date");
+  }
+
+  if (args.estimated_minutes != null && (!Number.isInteger(args.estimated_minutes) || args.estimated_minutes <= 0)) {
+    throw new Error("get_availability_windows estimated_minutes must be a positive integer");
+  }
+
+  const selectedResourceIds = args.resource_ids?.length
+    ? args.resource_ids
+    : state.resources.map((resource) => resource.key);
+  const resourcesById = new Map(state.resources.map((resource) => [resource.key, resource]));
+
+  selectedResourceIds.forEach((resourceId) => {
+    if (!resourcesById.has(resourceId)) {
+      throw new Error(`Unknown resource_id: ${resourceId}`);
+    }
+  });
+
+  const dayStart = setMinutesOfDay(date, workStartMinutes);
+  const dayEnd = setMinutesOfDay(date, workEndMinutes);
+
+  return {
+    date: args.date,
+    working_hours: {
+      start: "09:00",
+      end: "18:00",
+    },
+    lunch: {
+      start: "12:00",
+      end: "13:00",
+      behavior: "pause_only_not_occupied",
+    },
+    resources: selectedResourceIds.map((resourceId) => {
+      const resource = resourcesById.get(resourceId);
+      const occupied = state.scheduledItems
+        .filter((item) => item.resource_id === resourceId && getDatePart(item.start_date) === args.date)
+        .map((item) => ({
+          id: item.id,
+          start_date: item.start_date,
+          end_date: item.end_date,
+          text: item.text,
+        }))
+        .sort((a, b) => parseSchedulerDate(a.start_date).getTime() - parseSchedulerDate(b.start_date).getTime());
+      const boundaries = [
+        dayStart,
+        ...occupied.flatMap((item) => [
+          parseSchedulerDate(item.start_date),
+          parseSchedulerDate(item.end_date),
+        ]),
+        dayEnd,
+      ];
+      const windows = [];
+
+      for (let index = 0; index < boundaries.length - 1; index += 2) {
+        const startDate = boundaries[index];
+        const endDate = boundaries[index + 1];
+
+        if (endDate <= startDate) {
+          continue;
+        }
+
+        const availableWorkingMinutes = calculateExactWorkingMinutes(startDate, endDate);
+        const candidateEndDate = args.estimated_minutes == null
+          ? undefined
+          : calculateLunchAwareEndDate(startDate, args.estimated_minutes);
+
+        windows.push({
+          start_date: formatSchedulerDate(startDate),
+          end_date: formatSchedulerDate(endDate),
+          available_elapsed_minutes: getElapsedMinutes(startDate, endDate),
+          available_working_minutes: availableWorkingMinutes,
+          can_fit: candidateEndDate == null
+            ? true
+            : candidateEndDate <= endDate && candidateEndDate <= dayEnd,
+          ...(candidateEndDate ? { candidate_end_date: formatSchedulerDate(candidateEndDate) } : {}),
+        });
+      }
+
+      return {
+        resource_id: resourceId,
+        resource_label: resource?.label ?? resourceId,
+        resource_description: resource?.description ?? "",
+        occupied,
+        windows,
+      };
+    }),
+  };
 }
 
 function ensureAppointment(
@@ -246,18 +392,46 @@ function ensureAppointment(
     throw new Error("Appointment text is required");
   }
 
-  ensureResource(resources, appointment.resource_id);
-  ensureDateString(appointment.start_date, "start_date");
-  ensureDateString(appointment.end_date, "end_date");
+  ensureResource(resources, appointment.resource_id, appointment);
+
+  try {
+    ensureDateString(appointment.start_date, "start_date");
+  } catch (error) {
+    console.warn("[scheduler-diagnostics] validation failed: invalid start_date", {
+      appointment,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+
+  try {
+    ensureDateString(appointment.end_date, "end_date");
+  } catch (error) {
+    console.warn("[scheduler-diagnostics] validation failed: invalid end_date", {
+      appointment,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 
   const startDate = parseSchedulerDate(appointment.start_date);
   const endDate = parseSchedulerDate(appointment.end_date);
 
   if (endDate <= startDate) {
+    console.warn("[scheduler-diagnostics] validation failed: end before start", {
+      appointment,
+      startDate,
+      endDate,
+    });
     throw new Error("Appointment end_date must be after start_date");
   }
 
   if (startDate.toDateString() !== endDate.toDateString()) {
+    console.warn("[scheduler-diagnostics] validation failed: cross-day appointment", {
+      appointment,
+      startDate,
+      endDate,
+    });
     throw new Error("Appointment must start and end on the same day");
   }
 
@@ -265,6 +439,15 @@ function ensureAppointment(
   const endMinutes = getMinutesOfDay(endDate);
 
   if (startMinutes < workStartMinutes || endMinutes > workEndMinutes) {
+    console.warn("[scheduler-diagnostics] validation failed: outside working hours", {
+      appointment,
+      startMinutes,
+      endMinutes,
+      workingHours: {
+        start: workStartMinutes,
+        end: workEndMinutes,
+      },
+    });
     throw new Error("Appointment must stay within working hours 09:00-18:00");
   }
 }
@@ -276,7 +459,7 @@ function ensureNoSameResourceOverlap(
 ): void {
   const startDate = parseSchedulerDate(appointment.start_date);
   const endDate = parseSchedulerDate(appointment.end_date);
-  const overlaps = scheduledItems.some((item) => {
+  const overlappingItems = scheduledItems.filter((item) => {
     if (options.ignoreId != null && item.id === options.ignoreId) {
       return false;
     }
@@ -291,8 +474,31 @@ function ensureNoSameResourceOverlap(
     return startDate < itemEndDate && endDate > itemStartDate;
   });
 
-  if (overlaps) {
-    throw new Error(`Appointment overlaps an existing work order for resource_id: ${appointment.resource_id}`);
+  if (overlappingItems.length) {
+    const conflicts = overlappingItems.map((item) => ({
+      id: item.id,
+      resource_id: item.resource_id,
+      start_date: item.start_date,
+      end_date: item.end_date,
+    }));
+    const attempted = {
+      id: appointment.id,
+      resource_id: appointment.resource_id,
+      start_date: appointment.start_date,
+      end_date: appointment.end_date,
+    };
+
+    console.warn("[scheduler-diagnostics] validation failed: same-resource overlap", {
+      appointment,
+      overlappingItems,
+      ignoreId: options.ignoreId,
+    });
+    throw new Error([
+      `Appointment overlaps an existing work order for resource_id: ${appointment.resource_id}.`,
+      `Attempted appointment: ${JSON.stringify(attempted)}.`,
+      `Conflicting appointments: ${JSON.stringify(conflicts)}.`,
+      "Choose a different interval for the same resource or choose another resource after checking existing scheduledItems.",
+    ].join(" "));
   }
 }
 
@@ -349,12 +555,20 @@ export function createCommandRunner(options: CommandRunnerOptions) {
       case "get_scheduler_state":
         return toResult(cmd, cloneState(options.state));
 
+      case "get_availability_windows":
+        return toResult(cmd, buildAvailabilityWindows(options.state, args as GetAvailabilityWindowsArgs));
+
       case "add_appointment": {
         const appointment = args as AddAppointmentArgs;
         ensureAppointment(appointment, options.state.resources);
         ensureNoSameResourceOverlap(appointment, options.state.scheduledItems);
 
         if (options.state.scheduledItems.some((item) => item.id === appointment.id)) {
+          console.warn("[scheduler-diagnostics] validation failed: duplicate appointment id", {
+            cmd,
+            appointment,
+            existingScheduledIds: options.state.scheduledItems.map((item) => item.id),
+          });
           throw new Error(`Appointment already exists: ${appointment.id}`);
         }
 
@@ -373,6 +587,11 @@ export function createCommandRunner(options: CommandRunnerOptions) {
           const index = options.state.scheduledItems.findIndex((item) => item.id === patch.id);
 
           if (index === -1) {
+            console.warn("[scheduler-diagnostics] validation failed: update unknown appointment id", {
+              cmd,
+              patch,
+              existingScheduledIds: options.state.scheduledItems.map((item) => item.id),
+            });
             throw new Error(`Unknown appointment id: ${patch.id}`);
           }
 
@@ -395,6 +614,11 @@ export function createCommandRunner(options: CommandRunnerOptions) {
 
         ids.forEach((id) => {
           if (!options.state.scheduledItems.some((item) => item.id === id)) {
+            console.warn("[scheduler-diagnostics] validation failed: delete unknown appointment id", {
+              cmd,
+              id,
+              existingScheduledIds: options.state.scheduledItems.map((item) => item.id),
+            });
             throw new Error(`Unknown appointment id: ${id}`);
           }
         });
@@ -414,10 +638,20 @@ export function createCommandRunner(options: CommandRunnerOptions) {
           const item = options.state.scheduledItems.find((scheduledItem) => scheduledItem.id === id);
 
           if (!item) {
+            console.warn("[scheduler-diagnostics] validation failed: unschedule unknown appointment id", {
+              cmd,
+              id,
+              existingScheduledIds: options.state.scheduledItems.map((scheduledItem) => scheduledItem.id),
+            });
             throw new Error(`Unknown appointment id: ${id}`);
           }
 
           if (options.state.unscheduledItems.some((unscheduledItem) => unscheduledItem.id === id)) {
+            console.warn("[scheduler-diagnostics] validation failed: incoming request already exists", {
+              cmd,
+              id,
+              existingUnscheduledIds: options.state.unscheduledItems.map((unscheduledItem) => unscheduledItem.id),
+            });
             throw new Error(`Incoming request already exists for appointment id: ${id}`);
           }
 
@@ -448,6 +682,21 @@ export function createCommandRunner(options: CommandRunnerOptions) {
         const pendingUnscheduledById = new Map(
           options.state.unscheduledItems.map((item) => [item.id, item]),
         );
+        const stateBefore = summarizeState(options.state);
+
+        console.info("[scheduler-diagnostics] generate_schedule received", {
+          replaceExisting,
+          appointmentIds: appointments.map((appointment) => appointment.id),
+          appointmentResources: appointments.map((appointment) => ({
+            id: appointment.id,
+            resource_id: appointment.resource_id,
+            start_date: appointment.start_date,
+            end_date: appointment.end_date,
+          })),
+          existingScheduledIds: Array.from(existingScheduledIds),
+          pendingIncomingIds: Array.from(pendingUnscheduledById.keys()),
+          stateBefore,
+        });
 
         const normalizedAppointments = appointments.map((appointment) => {
           if (replaceExisting) {
@@ -469,10 +718,22 @@ export function createCommandRunner(options: CommandRunnerOptions) {
         if (!replaceExisting) {
           normalizedAppointments.forEach((appointment) => {
             if (existingScheduledIds.has(appointment.id)) {
+              console.warn("[scheduler-diagnostics] validation failed: generate_schedule reused scheduled id", {
+                appointment,
+                existingScheduledIds: Array.from(existingScheduledIds),
+                pendingIncomingIds: Array.from(pendingUnscheduledIds),
+                stateBefore,
+              });
               throw new Error(`generate_schedule cannot reuse existing scheduled appointment id: ${appointment.id}`);
             }
 
             if (!pendingUnscheduledIds.has(appointment.id)) {
+              console.warn("[scheduler-diagnostics] validation failed: generate_schedule id is not pending", {
+                appointment,
+                existingScheduledIds: Array.from(existingScheduledIds),
+                pendingIncomingIds: Array.from(pendingUnscheduledIds),
+                stateBefore,
+              });
               throw new Error(`generate_schedule appointment id must match a pending incoming request id: ${appointment.id}`);
             }
           });
@@ -486,12 +747,14 @@ export function createCommandRunner(options: CommandRunnerOptions) {
             ];
 
         normalizedAppointments.forEach((appointment) => ensureAppointment(appointment, options.state.resources));
-        nextScheduledItems.forEach((appointment) => {
-          ensureNoSameResourceOverlap(
-            appointment,
-            nextScheduledItems,
-            { ignoreId: appointment.id },
-          );
+
+        const scheduledItemsForValidation = replaceExisting
+          ? []
+          : options.state.scheduledItems.map((appointment) => ({ ...appointment }));
+
+        normalizedAppointments.forEach((appointment) => {
+          ensureNoSameResourceOverlap(appointment, scheduledItemsForValidation);
+          scheduledItemsForValidation.push(appointment);
         });
 
         const removedUnscheduledIds = options.state.unscheduledItems
@@ -506,6 +769,12 @@ export function createCommandRunner(options: CommandRunnerOptions) {
         options.state.unscheduledItems = options.state.unscheduledItems.filter(
           (item) => !scheduledIds.has(item.id),
         );
+
+        console.info("[scheduler-diagnostics] generate_schedule success state", {
+          generatedIds,
+          removedUnscheduledIds,
+          stateAfter: summarizeState(options.state),
+        });
 
         return toResult(cmd, syncScheduler(options));
       }

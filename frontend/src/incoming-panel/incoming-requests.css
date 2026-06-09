@@ -39,11 +39,44 @@
   transform: translateY(-1px);
 }
 
+.incoming-card[draggable="false"]:hover {
+  cursor: default;
+  transform: none;
+}
+
 .incoming-card--dragging {
   border-color: #456b92;
   background: #edf4fb;
   box-shadow: 0 10px 24px rgba(33, 45, 62, 0.14);
   opacity: 0.72;
+}
+
+.incoming-card--preview {
+  position: relative;
+}
+
+.incoming-card--preview-existing {
+  opacity: 0.64;
+}
+
+.incoming-card--preview-proposed_removed {
+  border-color: #c8d2dc;
+  border-left-color: #43b88f;
+  background: #f3fbf7;
+  opacity: 0.72;
+}
+
+.incoming-card--preview-proposed_removed h3,
+.incoming-card--preview-proposed_removed p,
+.incoming-card--preview-proposed_removed dd {
+  text-decoration: line-through;
+}
+
+.incoming-card--preview-proposed_new {
+  border-color: #9ecfb9;
+  border-left-color: #2fa872;
+  background: #f0faf5;
+  box-shadow: 0 8px 20px rgba(47, 168, 114, 0.14);
 }
 
 .incoming-card__header {
@@ -98,6 +131,17 @@
   color: #617184;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.incoming-card__preview {
+  border-radius: 999px;
+  background: #e5f5ed;
+  color: #27664b;
+  font-size: 0.66rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 7px;
+  text-transform: uppercase;
 }
 
 .incoming-card h3 {

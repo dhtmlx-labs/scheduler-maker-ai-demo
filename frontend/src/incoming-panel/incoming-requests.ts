@@ -1,5 +1,11 @@
 import "./incoming-requests.css";
-import type { UnscheduledItem } from "../scheduler/types.ts";
+import type { UnscheduledPreviewItem } from "../preview/preview-session.ts";
+
+let dragDisabled = false;
+
+export function setIncomingRequestsDragDisabled(disabled: boolean): void {
+  dragDisabled = disabled;
+}
 
 function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
@@ -25,11 +31,31 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function renderRequestCard(item: UnscheduledItem): string {
+function getPreviewLabel(item: UnscheduledPreviewItem): string {
+  switch (item.preview_kind) {
+    case "existing":
+      return "Waiting";
+    case "proposed_new":
+      return "Restored";
+    case "proposed_removed":
+      return "Scheduling";
+    default:
+      return "";
+  }
+}
+
+function renderRequestCard(item: UnscheduledPreviewItem): string {
+  const previewLabel = getPreviewLabel(item);
+  const className = [
+    "incoming-card",
+    item.preview_kind ? "incoming-card--preview" : "",
+    item.preview_kind ? `incoming-card--preview-${item.preview_kind}` : "",
+  ].filter(Boolean).join(" ");
+
   return `
     <article
-      class="incoming-card"
-      draggable="true"
+      class="${className}"
+      draggable="${dragDisabled ? "false" : "true"}"
       data-request-id="${item.id}"
       data-estimated-minutes="${item.estimated_minutes}"
     >
@@ -44,6 +70,7 @@ function renderRequestCard(item: UnscheduledItem): string {
           <span class="incoming-card__duration">
             ${formatDuration(item.estimated_minutes)}
           </span>
+          ${previewLabel ? `<span class="incoming-card__preview">${escapeHtml(previewLabel)}</span>` : ""}
         </div>
       </div>
 
@@ -62,7 +89,7 @@ function renderRequestCard(item: UnscheduledItem): string {
   `;
 }
 
-export function renderIncomingRequestsPanel(items: UnscheduledItem[]): void {
+export function renderIncomingRequestsPanel(items: UnscheduledPreviewItem[]): void {
   const list = document.querySelector<HTMLElement>("#incoming_requests_list");
   const count = document.querySelector<HTMLElement>("#incoming_requests_count");
 
@@ -78,7 +105,7 @@ export function renderIncomingRequestsPanel(items: UnscheduledItem[]): void {
 }
 
 export function initIncomingRequestsPanel(
-  getItems: () => UnscheduledItem[],
+  getItems: () => UnscheduledPreviewItem[],
 ): void {
   const list = document.querySelector<HTMLElement>("#incoming_requests_list");
 
@@ -87,6 +114,11 @@ export function initIncomingRequestsPanel(
   }
 
   list.addEventListener("dragstart", (event) => {
+    if (dragDisabled) {
+      event.preventDefault();
+      return;
+    }
+
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) {

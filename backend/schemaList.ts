@@ -10,11 +10,11 @@ const dateTimeSchema = z.string().regex(
   /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
   "Use YYYY-MM-DD HH:mm",
 ).describe(
-  "Appointment date/time in Scheduler format YYYY-MM-DD HH:mm. Use the current date from the system prompt unless the user asks for another date. Use working hours 09:00-18:00. Lunch 12:00-13:00 pauses work and must not count toward estimated working duration.",
+  "Appointment date/time in Scheduler format YYYY-MM-DD HH:mm. Never leave this empty. Use the current date from the system prompt unless the user asks for another date. Use working hours 09:00-18:00. Lunch 12:00-13:00 pauses work and must not count toward estimated working duration. If the exact start_date or end_date is not known, call get_availability_windows again before calling a scheduling mutation tool.",
 );
 
 const resourceIdSchema = z.string().min(1).describe(
-  "Scheduler Timeline maintenance staff/team resource id. For this demo use alex, nina, marek, or sofia.",
+  "Scheduler Timeline resource id. Must exactly match the canonical resource identifier from the current get_scheduler_state resources list; for current resource objects use resources[].key. Do not invent placeholder ids.",
 );
 
 const appointmentStatusSchema = z.enum([
@@ -131,10 +131,10 @@ export const unscheduledItemSchema = z.object({
 
 const generateScheduleSchema = z.object({
   unscheduledItems: z.array(unscheduledItemSchema).optional().describe(
-    "Pending incoming maintenance requests without assigned resource/time. Use these as the source items when the user asks to schedule pending requests. They must not include resource_id, start_date, or end_date.",
+    "Pending incoming maintenance requests without assigned resource/time. Use these as the source items when the user asks to schedule pending requests. They must not include resource_id, start_date, or end_date. When the user asks for urgent incoming requests, the requested set is all unscheduledItems where priority is urgent unless the user explicitly asks otherwise.",
   ),
   appointments: z.array(scheduledItemObjectSchema).min(1).describe(
-    "New scheduled maintenance work orders created from pending incoming maintenance requests. For pending-request scheduling, include ONLY newly generated appointments, never existing scheduledItems. Each appointment id MUST equal the source unscheduled incoming request id. Calculate end_date from the request estimated_minutes; lunch 12:00-13:00 pauses work, so a work order may span lunch and must be extended by lunch time.",
+    "New scheduled maintenance work orders created from pending incoming maintenance requests. For pending-request scheduling, include ONLY newly generated appointments, never existing scheduledItems. Each appointment id MUST equal the source unscheduled incoming request id. Never call generate_schedule with empty start_date or end_date. If exact dates are not known, call get_availability_windows again first. If the user asked for urgent incoming requests, include every urgent unscheduled item that has a same-day non-overlapping placement preserving existing scheduled work orders; do not omit one just to ask whether to include it. Before choosing start_date/end_date, check existing scheduledItems for the same resource_id and use only a free interval that does not overlap any same-resource appointment. Calculate end_date from the request estimated_minutes; lunch 12:00-13:00 pauses work and is not an occupied appointment, so a work order may span lunch and must be extended by lunch time.",
   ),
   allowLunchOverlap: z.boolean().optional().describe(
     "Compatibility option. Lunch is treated as paused non-working time by default, so this is usually unnecessary.",
@@ -231,6 +231,21 @@ const clearAllSchema = z.object({
 
 const getSchedulerStateSchema = z.object({}).strict();
 
+const getAvailabilityWindowsSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").describe(
+    "Date to inspect in YYYY-MM-DD format.",
+  ),
+  estimated_minutes: z.number().int().positive().optional().describe(
+    "Optional working duration to test against available windows. Lunch 12:00-13:00 does not count toward this duration.",
+  ),
+  resource_ids: z.array(resourceIdSchema).min(1).optional().describe(
+    "Optional resource ids to inspect. If omitted, inspect all current resources. Each id must come from get_scheduler_state.resources[].key.",
+  ),
+  work_type: z.string().min(1).optional().describe(
+    "Optional requested work type for context only. This tool does not choose or filter the final resource automatically.",
+  ),
+}).strict();
+
 const setViewSchema = z.object({
   view: z.enum(["timeline", "day", "week"]).describe("Scheduler view to activate."),
 }).strict();
@@ -265,6 +280,7 @@ export const toolSchemasByName = {
   delete_appointments: deleteAppointmentsSchema,
   clear_all: clearAllSchema,
   get_scheduler_state: getSchedulerStateSchema,
+  get_availability_windows: getAvailabilityWindowsSchema,
   unschedule_appointments: unscheduleAppointmentsSchema,
   set_view: setViewSchema,
   set_skin: setSkinSchema,
@@ -279,19 +295,21 @@ export type ToolArgumentsByName = {
 
 const toolDescriptions: Record<ToolName, string> = {
   generate_schedule:
-    "Schedule pending incoming maintenance requests into the existing Scheduler day. For normal pending-request scheduling, generate work orders only from unscheduledItems, preserve each incoming request id, do not include existing scheduledItems, and do not replace the existing schedule unless replaceExisting is explicitly true.",
+    "Prepare a preview schedule for pending incoming maintenance requests. For normal pending-request scheduling, generate work orders only from unscheduledItems, preserve each incoming request id, use resource_id values that exactly match current get_scheduler_state resources identifiers, check same-resource existing appointments before placement, do not include existing scheduledItems, and do not replace the existing schedule unless replaceExisting is explicitly true. If the user asks for urgent incoming requests, prepare all urgent unscheduled items that can fit without moving/replacing existing work orders.",
   add_appointment:
-    "Create one scheduled maintenance work order with assigned resource and start/end time.",
+    "Prepare a preview containing one scheduled maintenance work order with assigned resource and start/end time. resource_id must match the current get_scheduler_state resources identifier.",
   update_appointments:
-    "Update one or more existing scheduled maintenance work orders by id.",
+    "Prepare a preview update for one or more existing scheduled maintenance work orders by id.",
   delete_appointments:
-    "Delete one or more scheduled maintenance work orders by id.",
+    "Prepare a preview deletion for one or more scheduled maintenance work orders by id.",
   clear_all:
-    "Clear scheduled maintenance work orders, optionally also clearing incoming unscheduled requests.",
+    "Prepare a preview that clears scheduled maintenance work orders, optionally also clearing incoming unscheduled requests.",
   get_scheduler_state:
     "Return the current Scheduler state, including scheduled maintenance work orders, incoming requests, and resources.",
+  get_availability_windows:
+    "Return read-only availability facts for a date: occupied intervals, available windows, lunch pause behavior, and optional fit/candidate end time for an estimated duration. This is diagnostic support only; it does not choose a final resource, create appointments, start previews, or mutate state.",
   unschedule_appointments:
-    "Move one or more scheduled maintenance work orders back into Incoming Requests by id. Use this when the user asks to unschedule, unassign, or move a work order back to the request queue.",
+    "Prepare a preview that moves one or more scheduled maintenance work orders back into Incoming Requests by id. Use this when the user asks to unschedule, unassign, or move a work order back to the request queue.",
   set_view:
     "Change the Scheduler view.",
   set_skin:

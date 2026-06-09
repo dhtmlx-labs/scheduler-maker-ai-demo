@@ -149,17 +149,41 @@ export function saveMessage(
 export async function executeToolCall({
   socket,
   call,
+  requestId,
+  turn,
+  toolIndex,
 }: {
   socket: Socket;
   call: ChatCompletionMessageToolCall;
+  requestId?: string;
+  turn?: number;
+  toolIndex?: number;
 }): Promise<ClientToolResult> {
   const cmd = validateToolName(call.function.name);
-  const params = validateToolArguments(cmd, parseToolArguments(call.function.arguments));
+  const context = {
+    turn,
+    toolIndex,
+    toolCallId: call.id,
+    toolName: call.function.name,
+  };
 
-  log.info("tool_call", cmd, params);
+  log.info("[diagnostics] raw_tool_arguments", {
+    ...context,
+    rawArguments: call.function.arguments,
+  });
+
+  const parsedArgs = parseToolArguments(call.function.arguments);
+  const params = validateToolArguments(cmd, parsedArgs);
+
+  log.info("[diagnostics] validated_tool_arguments", {
+    ...context,
+    cmd,
+    params,
+  });
 
   return requestClientToolExecution(socket, {
     toolCallId: call.id,
+    requestId,
     cmd,
     params,
   });
@@ -213,6 +237,7 @@ function requestClientToolExecution(
   payload: ClientToolRequest,
 ): Promise<ClientToolResult> {
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
     const timeout = setTimeout(() => {
       reject(new Error(`Timed out waiting for tool result: ${payload.cmd}`));
     }, TOOL_TIMEOUT_MS);
@@ -226,6 +251,13 @@ function requestClientToolExecution(
       }
 
       log.info("tool_result", summarizeToolResult(result));
+      log.info("[diagnostics] tool_ack_received", {
+        toolCallId: payload.toolCallId,
+        cmd: payload.cmd,
+        durationMs: Date.now() - startedAt,
+        ok: result.ok,
+        result,
+      });
       resolve(result);
     });
   });

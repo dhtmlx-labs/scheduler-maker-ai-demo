@@ -41,7 +41,10 @@
 }
 
 .chat-message--assistant,
-.chat-message--system {
+.chat-message--system,
+.chat-message--success,
+.chat-message--warning,
+.chat-message--preview-actions {
   justify-content: flex-start;
 }
 
@@ -69,12 +72,88 @@
   color: #8a3030;
 }
 
+.chat-message--success .chat-message__bubble {
+  border: 1px solid #bfd4c4;
+  background: #e8f7ed;
+  color: #1f6b3d;
+}
+
+.chat-message--warning .chat-message__bubble {
+  border: 1px solid #efcf8f;
+  background: #fff7e6;
+  color: #875515;
+}
+
 .chat-message__bubble p {
   margin: 0 0 8px;
 }
 
 .chat-message__bubble p:last-child {
   margin-bottom: 0;
+}
+
+.chat-preview-actions {
+  width: min(88%, 420px);
+  border: 1px solid #acd6bf;
+  border-radius: 8px;
+  background: #eefaf3;
+  padding: 10px;
+}
+
+.chat-preview-actions[hidden] {
+  display: none;
+}
+
+.chat-preview-actions h3,
+.chat-preview-actions p {
+  margin: 0;
+}
+
+.chat-preview-actions h3 {
+  color: #27664b;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.chat-preview-actions p {
+  margin-top: 3px;
+  color: #263548;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.chat-preview-actions__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-preview-actions__button {
+  min-height: 34px;
+  border: 1px solid #a8bbc9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #29384d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.chat-preview-actions__button--apply {
+  border-color: #27664b;
+  background: #27664b;
+  color: #ffffff;
+}
+
+.chat-preview-actions__button:hover:not(:disabled) {
+  filter: brightness(0.98);
+}
+
+.chat-preview-actions__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .chat-loader {
@@ -180,6 +259,10 @@
   padding: 0 12px;
 }
 
+.chat-submit--cancel {
+  background: #8a3030;
+}
+
 .chat-submit:disabled,
 .chat-voice:disabled,
 .chat-input:disabled {
@@ -197,6 +280,81 @@
 
 .chat-voice-status:empty {
   display: none;
+}
+
+.chat-cancel-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(31, 42, 56, 0.38);
+  padding: 16px;
+}
+
+.chat-cancel-dialog[hidden] {
+  display: none;
+}
+
+.chat-cancel-dialog__panel {
+  width: min(360px, 100%);
+  border: 1px solid #d6dde6;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(31, 42, 56, 0.2);
+  padding: 16px;
+}
+
+.chat-cancel-dialog__panel h3,
+.chat-cancel-dialog__panel p {
+  margin: 0;
+}
+
+.chat-cancel-dialog__panel h3 {
+  color: #223044;
+  font-size: 1rem;
+}
+
+.chat-cancel-dialog__panel p {
+  margin-top: 8px;
+  color: #4d5f73;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.chat-cancel-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.chat-cancel-dialog__button {
+  min-height: 36px;
+  border: 1px solid #a8bbc9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #29384d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.chat-cancel-dialog__button--primary {
+  border-color: #29384d;
+  background: #29384d;
+  color: #ffffff;
+}
+
+.chat-cancel-dialog__button--danger {
+  border-color: #8a3030;
+  color: #8a3030;
+}
+
+.chat-cancel-dialog__button:hover {
+  filter: brightness(0.98);
 }
 
 @keyframes chat-pulse {

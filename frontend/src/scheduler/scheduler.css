@@ -72,6 +72,40 @@
   border-left-color: #f25555;
 }
 
+.service-event--preview {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.service-event--preview-existing {
+  opacity: 0.42;
+}
+
+.service-event--preview-proposed_new,
+.service-event--preview-proposed_moved {
+  background: #1f7a6b;
+  border-color: #d7f1e8;
+  border-left-color: #40d39a;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 0 0 2px rgba(64, 211, 154, 0.22);
+}
+
+.service-event--preview-old_position,
+.service-event--preview-proposed_deleted {
+  background: #6c7785;
+  border-color: #d5dce4;
+  border-left-color: #9aa6b4;
+  opacity: 0.48;
+}
+
+.service-event--preview-old_position {
+  border-style: dashed;
+}
+
+.service-event--preview-proposed_deleted {
+  text-decoration: line-through;
+}
+
 .service-event__title {
   width: 100%;
   overflow: hidden;
@@ -91,6 +125,17 @@
   opacity: 0.92;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.service-event__preview-label {
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 3px 5px;
+  text-transform: uppercase;
 }
 
 .non_working_time {
