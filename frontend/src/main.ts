@@ -22,6 +22,7 @@ import {
   setSchedulerZoom,
 } from "./scheduler/scheduler-board.ts";
 import type { ScheduledItem, SchedulerItemId, SchedulerState } from "./scheduler/types.ts";
+import { getItemIds, summarizeStateIds } from "./scheduler/state-debug.ts";
 import {
   applyPreviewToLive,
   buildScheduledPreviewItems,
@@ -74,8 +75,8 @@ function setAiRequestPending(nextPending: boolean): void {
 
 function emitSchedulerStateEvent(type: "preview_applied" | "preview_canceled"): void {
   const state = getPreviewAwareState(appState);
-  const scheduledIds: SchedulerItemId[] = appState.scheduledItems.map((item) => item.id);
-  const unscheduledIds: SchedulerItemId[] = appState.unscheduledItems.map((item) => item.id);
+  const scheduledIds: SchedulerItemId[] = getItemIds(appState.scheduledItems);
+  const unscheduledIds: SchedulerItemId[] = getItemIds(appState.unscheduledItems);
 
   socket.emit("scheduler_state_event", {
     type,
@@ -106,10 +107,20 @@ wireSchedulerDropTarget(refreshIncomingRequests, {
 renderChatPreviewActions(false);
 
 function applyCurrentPreview(): boolean {
+  console.info("[scheduler-preview] applying preview draft", {
+    draftScheduledIds: getItemIds(previewSession.draftState?.scheduledItems),
+    draftUnscheduledIds: getItemIds(previewSession.draftState?.unscheduledItems),
+    visiblePreviewItems: buildScheduledPreviewItems().map((item) => ({
+      id: item.id,
+      sourceId: item.preview_source_id ?? item.id,
+      previewKind: item.preview_kind ?? "live",
+    })),
+  });
+
   if (applyPreviewToLive(appState)) {
     console.info("[scheduler-preview] preview applied", {
-      liveScheduledIds: appState.scheduledItems.map((item) => item.id),
-      liveUnscheduledIds: appState.unscheduledItems.map((item) => item.id),
+      liveScheduledIds: getItemIds(appState.scheduledItems),
+      liveUnscheduledIds: getItemIds(appState.unscheduledItems),
     });
     refreshPreviewUi();
     emitSchedulerStateEvent("preview_applied");
@@ -122,8 +133,8 @@ function applyCurrentPreview(): boolean {
 function cancelCurrentPreview(): boolean {
   if (cancelPreview()) {
     console.info("[scheduler-preview] preview canceled", {
-      liveScheduledIds: appState.scheduledItems.map((item) => item.id),
-      liveUnscheduledIds: appState.unscheduledItems.map((item) => item.id),
+      liveScheduledIds: getItemIds(appState.scheduledItems),
+      liveUnscheduledIds: getItemIds(appState.unscheduledItems),
     });
     refreshPreviewUi();
     emitSchedulerStateEvent("preview_canceled");
@@ -160,13 +171,6 @@ function createRunnerForState(state: SchedulerState) {
   });
 }
 
-function stateIds(state: SchedulerState | null): { scheduledIds: Array<string | number>; unscheduledIds: Array<string | number> } {
-  return {
-    scheduledIds: state?.scheduledItems.map((item) => item.id) ?? [],
-    unscheduledIds: state?.unscheduledItems.map((item) => item.id) ?? [],
-  };
-}
-
 function commitTransactionState(target: SchedulerState, transactionState: SchedulerState): void {
   target.scheduledItems = transactionState.scheduledItems.map((item) => ({ ...item }));
   target.unscheduledItems = transactionState.unscheduledItems.map((item) => ({ ...item }));
@@ -188,7 +192,7 @@ function runCommand(cmd: string, params?: any) {
     ? startPreviewFromLive(appState)
     : getPlanningState(appState);
   const transactionState = isPreviewMutation ? cloneSchedulerState(state) : state;
-  const beforeIds = stateIds(state);
+  const beforeIds = summarizeStateIds(state);
   setSchedulerPreviewMode(previewSession.active);
   setSchedulerReadOnly(isSchedulingUiLocked());
   setIncomingRequestsDragDisabled(isSchedulingUiLocked());
@@ -202,8 +206,8 @@ function runCommand(cmd: string, params?: any) {
       cmd,
       startedPreview,
       before: beforeIds,
-      after: stateIds(state),
-      unchanged: JSON.stringify(beforeIds) === JSON.stringify(stateIds(state)),
+      after: summarizeStateIds(state),
+      unchanged: JSON.stringify(beforeIds) === JSON.stringify(summarizeStateIds(state)),
       error: error instanceof Error ? error.message : String(error),
     });
 
@@ -224,10 +228,25 @@ function runCommand(cmd: string, params?: any) {
     console.info("[scheduler-preview] preview draft updated", {
       cmd,
       active: previewSession.active,
-      liveScheduledIds: appState.scheduledItems.map((item) => item.id),
-      draftScheduledIds: previewSession.draftState?.scheduledItems.map((item) => item.id) ?? [],
-      liveUnscheduledIds: appState.unscheduledItems.map((item) => item.id),
-      draftUnscheduledIds: previewSession.draftState?.unscheduledItems.map((item) => item.id) ?? [],
+      liveScheduledIds: getItemIds(appState.scheduledItems),
+      draftScheduledIds: getItemIds(previewSession.draftState?.scheduledItems),
+      liveUnscheduledIds: getItemIds(appState.unscheduledItems),
+      draftUnscheduledIds: getItemIds(previewSession.draftState?.unscheduledItems),
+    });
+  }
+
+  if (cmd === "generate_schedule") {
+    console.info("[scheduler-preview] generate_schedule draft state after success", {
+      active: previewSession.active,
+      draftScheduledIds: getItemIds(previewSession.draftState?.scheduledItems),
+      draftUnscheduledIds: getItemIds(previewSession.draftState?.unscheduledItems),
+      visiblePreviewItems: previewSession.active
+        ? buildScheduledPreviewItems().map((item) => ({
+            id: item.id,
+            sourceId: item.preview_source_id ?? item.id,
+            previewKind: item.preview_kind ?? "live",
+          }))
+        : [],
     });
   }
 

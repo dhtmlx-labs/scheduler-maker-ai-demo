@@ -1,8 +1,10 @@
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import type { Socket } from "socket.io-client";
 
-import type { AvailabilityResult, CommandResult, SchedulerState } from "../scheduler/types.ts";
+import type { CommandResult, SchedulerState } from "../scheduler/types.ts";
+import { appendChatMessage, renderMarkdown, sanitizeText, type ChatMessageKind } from "./message-rendering.ts";
+import { createRequestCancelDialog } from "./request-cancel-dialog.ts";
+import { getSpeechRecognitionConstructor, type BrowserSpeechRecognition } from "./speech-recognition.ts";
+import { getDuplicateGenerateScheduleRecovery, summarizeToolResult } from "./tool-summaries.ts";
 
 import "./chat-widget.css";
 
@@ -21,45 +23,6 @@ type InitChatOptions = {
   onCancelPreview: () => boolean;
   onPendingChange?: (pending: boolean) => void;
 };
-
-type BrowserSpeechRecognitionEvent = Event & {
-  results: {
-    length: number;
-    [index: number]: {
-      length: number;
-      [index: number]: {
-        transcript: string;
-      };
-    };
-  };
-};
-
-type BrowserSpeechRecognitionErrorEvent = Event & {
-  error?: string;
-};
-
-type BrowserSpeechRecognition = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  abort: () => void;
-  start: () => void;
-  stop: () => void;
-  onend: (() => void) | null;
-  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
-  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
-  onstart: (() => void) | null;
-};
-
-type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
-
-declare global {
-  interface Window {
-    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
-    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
-  }
-}
 
 const starterPrompts = [
   "Generate today's schedule from pending maintenance requests.",
@@ -147,131 +110,6 @@ function isToolCallPayload(payload: unknown): payload is ToolCallPayload {
   return typeof maybePayload.toolCallId === "string" && typeof maybePayload.cmd === "string";
 }
 
-function sanitizeText(value: string): string {
-  return DOMPurify.sanitize(value);
-}
-
-function renderMarkdown(value: string): string {
-  return DOMPurify.sanitize(marked.parse(value, { async: false }) as string);
-}
-
-function getSpeechRecognitionConstructor(): BrowserSpeechRecognitionConstructor | undefined {
-  return window.SpeechRecognition ?? window.webkitSpeechRecognition;
-}
-
-function extractIds(params: unknown): Array<string | number> {
-  if (!params || typeof params !== "object") {
-    return [];
-  }
-
-  const maybeParams = params as {
-    ids?: Array<string | number>;
-    appointments?: Array<{ id?: string | number }>;
-  };
-
-  return maybeParams.ids ?? maybeParams.appointments?.flatMap((item) => (
-    item.id == null ? [] : [item.id]
-  )) ?? [];
-}
-
-function summarizeAvailabilityResult(result: unknown): string {
-  const availability = result as AvailabilityResult | undefined;
-
-  if (!availability?.resources?.length) {
-    return "get_availability_windows completed. No resource availability rows were returned.";
-  }
-
-  const resourceSummaries = availability.resources.map((resource) => {
-    const fittingWindows = resource.windows.filter((window) => window.can_fit);
-    const windowSummary = fittingWindows.length
-      ? fittingWindows
-          .slice(0, 4)
-          .map((window) => `${window.start_date}-${window.end_date}${window.candidate_end_date ? ` candidate_end_date ${window.candidate_end_date}` : ""}`)
-          .join("; ")
-      : "no fitting windows";
-
-    return `${resource.resource_id}: occupied ${resource.occupied.length}; ${windowSummary}`;
-  }).join(" | ");
-
-  return [
-    `get_availability_windows completed for ${availability.date}.`,
-    `Working hours ${availability.working_hours.start}-${availability.working_hours.end}.`,
-    `Lunch ${availability.lunch.start}-${availability.lunch.end} is ${availability.lunch.behavior}.`,
-    resourceSummaries,
-    "Use these facts to choose proposed appointments; this tool did not mutate live or preview state.",
-  ].join(" ");
-}
-
-function summarizeToolResult(cmd: string, params: unknown, state: SchedulerState, result?: CommandResult): string {
-  const scheduledIds = state.scheduledItems.map((item) => item.id).join(", ") || "none";
-  const unscheduledIds = state.unscheduledItems.map((item) => item.id).join(", ") || "none";
-  const previewPrefix = state.preview?.active
-    ? "Preview prepared. Live schedule is unchanged until the user clicks Apply."
-    : "";
-
-  if (cmd === "get_availability_windows") {
-    return summarizeAvailabilityResult(result?.data);
-  }
-
-  if (cmd === "set_zoom") {
-    return "set_zoom completed successfully. Confirm the Timeline range change briefly. Do not list scheduled or unscheduled items.";
-  }
-
-  if (cmd === "set_date") {
-    return "set_date completed successfully. Confirm the date change briefly. Do not list scheduled or unscheduled items.";
-  }
-
-  if (cmd === "set_skin") {
-    return "set_skin completed successfully. Confirm the skin change briefly. Do not list scheduled or unscheduled items.";
-  }
-
-  if (cmd === "delete_appointments") {
-    const deletedIds = extractIds(params).join(", ") || "unknown";
-
-    return [
-      previewPrefix || `delete_appointments completed successfully. Deleted ids: ${deletedIds}.`,
-      previewPrefix ? `Preview deleted ids: ${deletedIds}.` : "",
-      `Current scheduled ids: ${scheduledIds}.`,
-      "Do not call delete_appointments again for the same ids unless the user explicitly asks for another delete.",
-    ].filter(Boolean).join(" ");
-  }
-
-  if (cmd === "unschedule_appointments") {
-    const restoredIds = extractIds(params).join(", ") || "unknown";
-
-    return [
-      previewPrefix || `unschedule_appointments completed successfully. Restored incoming request ids: ${restoredIds}.`,
-      previewPrefix ? `Preview restored incoming request ids: ${restoredIds}.` : "",
-      `Current scheduled ids: ${scheduledIds}. Current unscheduled ids: ${unscheduledIds}.`,
-    ].filter(Boolean).join(" ");
-  }
-
-  if (cmd === "generate_schedule") {
-    const generatedIds = extractIds(params);
-    const generatedIdList = generatedIds.join(", ") || "unknown";
-    const remainingUrgentItems = state.unscheduledItems.filter((item) => item.priority === "urgent");
-    const remainingUrgentSummary = remainingUrgentItems
-      .map((item) => `${item.id} (${item.text}, ${item.estimated_minutes} min, ${item.work_type})`)
-      .join("; ");
-
-    return [
-      previewPrefix || "generate_schedule completed successfully.",
-      `Preview included generated request ids: ${generatedIdList}.`,
-      `Preview scheduled ids: ${scheduledIds}. Preview unscheduled ids: ${unscheduledIds}.`,
-      remainingUrgentItems.length
-        ? `Urgent incoming requests still pending: ${remainingUrgentSummary}. If the user asked to schedule urgent incoming requests, this preview is incomplete unless each remaining urgent request has a concrete blocker. Continue planning any remaining urgent request that can fit today without moving/replacing existing scheduled work orders; ask only if moving/replacing work, changing date, or using an unsuitable resource is required.`
-        : "No urgent incoming requests remain pending. If the user asked to schedule urgent incoming requests, the urgent preview set is complete.",
-      "Reply that a preview is ready for review; do not say the live schedule changed. State which urgent request ids are included and which, if any, could not be included with the exact reason.",
-    ].filter(Boolean).join(" ");
-  }
-
-  if (previewPrefix) {
-    return `${previewPrefix} Preview scheduled ids: ${scheduledIds}. Preview unscheduled ids: ${unscheduledIds}. Reply that a preview is ready for review; do not say the live schedule changed.`;
-  }
-
-  return `${cmd} completed successfully. Current scheduled ids: ${scheduledIds}. Current unscheduled ids: ${unscheduledIds}.`;
-}
-
 export function initChat({
   socket,
   runCommand,
@@ -343,11 +181,6 @@ export function initChat({
     return;
   }
 
-  const requestCancelDialog = cancelDialog;
-  const requestCancelTitle = cancelTitle;
-  const requestCancelBody = cancelBody;
-  const requestCancelContinue = cancelContinue;
-  const requestCancelStop = cancelStop;
   previewActionsHost = messages;
   renderChatPreviewActions(previewActionsActive);
 
@@ -364,6 +197,15 @@ export function initChat({
   let currentRequestId: string | null = null;
   let toolStartedForCurrentRequest = false;
   const canceledRequestIds = new Set<string>();
+  const requestCancelController = createRequestCancelDialog({
+    dialog: cancelDialog,
+    title: cancelTitle,
+    body: cancelBody,
+    continueButton: cancelContinue,
+    stopButton: cancelStop,
+    hasToolStarted: () => toolStartedForCurrentRequest,
+    onStop: stopCurrentRequest,
+  });
 
   function setPending(nextPending: boolean): void {
     pending = nextPending;
@@ -382,16 +224,11 @@ export function initChat({
   }
 
   function closeCancelDialog(): void {
-    requestCancelDialog.hidden = true;
+    requestCancelController.close();
   }
 
   function openCancelDialog(): void {
-    requestCancelTitle.textContent = "Stop current request?";
-    requestCancelBody.textContent = toolStartedForCurrentRequest
-      ? "The assistant has already started processing scheduling operations. Any unfinished planning work from this request will be discarded."
-      : "The assistant is still processing. Any unfinished work from this request will be discarded.";
-    requestCancelDialog.hidden = false;
-    requestCancelContinue.focus();
+    requestCancelController.open();
   }
 
   function stopCurrentRequest(): void {
@@ -431,16 +268,8 @@ export function initChat({
     status.classList.toggle("chat-status--connected", connected);
   }
 
-  function scrollMessages(): void {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-  function appendMessage(kind: "user" | "assistant" | "system" | "success" | "warning", html: string): void {
-    const item = document.createElement("div");
-    item.className = `chat-message chat-message--${kind}`;
-    item.innerHTML = `<div class="chat-message__bubble">${html}</div>`;
-    chatMessages.appendChild(item);
-    scrollMessages();
+  function appendMessage(kind: ChatMessageKind, html: string): void {
+    appendChatMessage(chatMessages, kind, html);
   }
 
   function sendUserMessage(message: string): void {
@@ -527,20 +356,6 @@ export function initChat({
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     sendUserMessage(chatInput.value);
-  });
-
-  requestCancelContinue.addEventListener("click", () => {
-    closeCancelDialog();
-  });
-
-  requestCancelStop.addEventListener("click", () => {
-    stopCurrentRequest();
-  });
-
-  requestCancelDialog.addEventListener("click", (event) => {
-    if (event.target === requestCancelDialog) {
-      closeCancelDialog();
-    }
   });
 
   chatVoice.addEventListener("click", () => {
@@ -670,12 +485,18 @@ export function initChat({
       });
       appendMessage("system", sanitizeText(`Tool call failed: ${message}`));
       const state = getSchedulerState();
+      const duplicateRecovery = getDuplicateGenerateScheduleRecovery(payload.cmd, message, state);
       ack?.({
         ok: false,
         toolCallId: payload.toolCallId,
         cmd: payload.cmd,
-        error: `${message}. No successful scheduling change should be claimed unless a later get_scheduler_state confirms it.`,
-        summary: `${payload.cmd} failed. No successful scheduling change should be claimed. Current state included for grounding.`,
+        error: [
+          message,
+          duplicateRecovery,
+          "No successful scheduling change should be claimed unless current state data confirms it.",
+        ].filter(Boolean).join(" "),
+        summary: duplicateRecovery
+          ?? `${payload.cmd} failed. No successful scheduling change should be claimed. Current state included for grounding.`,
         data: state,
       });
     }

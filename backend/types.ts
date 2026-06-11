@@ -48,6 +48,8 @@ export type ClientToolResult =
       ok: false;
       cmd: string;
       error: string;
+      data?: unknown;
+      summary?: string;
       toolCallId?: string;
     };
 

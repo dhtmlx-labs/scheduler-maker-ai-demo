@@ -149,7 +149,6 @@ function configureScheduler(): void {
   ];
 
   scheduler.config.date_format = "%Y-%m-%d %H:%i";
-  // scheduler.templates.parse_date
 
   scheduler.createTimelineView({
     name: "timeline",
