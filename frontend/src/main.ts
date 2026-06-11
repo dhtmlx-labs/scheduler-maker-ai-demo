@@ -18,7 +18,6 @@ import {
   setSchedulerPreviewMode,
   setSchedulerReadOnly,
   setSchedulerSkin,
-  setSchedulerView,
   setSchedulerZoom,
 } from "./scheduler/scheduler-board.ts";
 import type { ScheduledItem, SchedulerItemId, SchedulerState } from "./scheduler/types.ts";
@@ -159,7 +158,6 @@ const schedulerController = {
   },
   setDate: setSchedulerDate,
   setSkin: setSchedulerSkin,
-  setView: setSchedulerView,
   setZoom: setSchedulerZoom,
 };
 

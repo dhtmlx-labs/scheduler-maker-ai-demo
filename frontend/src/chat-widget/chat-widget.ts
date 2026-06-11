@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io-client";
 
 import type { CommandResult, SchedulerState } from "../scheduler/types.ts";
+import { renderCommandGuideModal, renderContextualSuggestions, renderPromptButtons } from "./command-guide.ts";
 import { appendChatMessage, renderMarkdown, sanitizeText, type ChatMessageKind } from "./message-rendering.ts";
 import { createRequestCancelDialog } from "./request-cancel-dialog.ts";
 import { getSpeechRecognitionConstructor, type BrowserSpeechRecognition } from "./speech-recognition.ts";
@@ -131,7 +132,10 @@ export function initChat({
           <p class="eyebrow">AI Assistant</p>
           <h2>Facilities Chat</h2>
         </div>
-        <span id="chat_connection_status" class="chat-status">Connecting</span>
+        <div class="chat-header-actions">
+          <button id="chat_command_guide_open" class="chat-help" type="button" aria-haspopup="dialog">Guide</button>
+          <span id="chat_connection_status" class="chat-status">Connecting</span>
+        </div>
       </div>
       <div id="chat_messages" class="chat-messages" aria-live="polite"></div>
       <div id="chat_loader" class="chat-loader" hidden>
@@ -139,9 +143,7 @@ export function initChat({
         <span class="chat-loader__text">Waiting for assistant</span>
       </div>
       <div class="chat-prompts" aria-label="Starter prompts">
-        ${starterPrompts
-          .map((prompt) => `<button class="prompt-pill" type="button">${sanitizeText(prompt)}</button>`)
-          .join("")}
+        ${renderPromptButtons(starterPrompts)}
       </div>
       <form id="chat_form" class="chat-form">
         <input id="chat_input" class="chat-input" type="text" autocomplete="off" placeholder="Ask the facilities assistant..." />
@@ -159,10 +161,13 @@ export function initChat({
           </div>
         </div>
       </div>
+      ${renderCommandGuideModal()}
     </div>
   `;
 
   const status = container.querySelector<HTMLElement>("#chat_connection_status");
+  const commandGuideOpen = container.querySelector<HTMLButtonElement>("#chat_command_guide_open");
+  const commandGuide = container.querySelector<HTMLElement>("#chat_command_guide");
   const messages = container.querySelector<HTMLElement>("#chat_messages");
   const loader = container.querySelector<HTMLElement>("#chat_loader");
   const form = container.querySelector<HTMLFormElement>("#chat_form");
@@ -177,10 +182,12 @@ export function initChat({
   const cancelStop = container.querySelector<HTMLButtonElement>("#chat_cancel_stop");
   const promptButtons = Array.from(container.querySelectorAll<HTMLButtonElement>(".prompt-pill"));
 
-  if (!messages || !loader || !form || !input || !submit || !voice || !voiceStatus || !cancelDialog || !cancelTitle || !cancelBody || !cancelContinue || !cancelStop) {
+  if (!messages || !loader || !form || !input || !submit || !voice || !voiceStatus || !cancelDialog || !cancelTitle || !cancelBody || !cancelContinue || !cancelStop || !commandGuideOpen || !commandGuide) {
     return;
   }
 
+  const chatCommandGuideOpen = commandGuideOpen;
+  const chatCommandGuide = commandGuide;
   previewActionsHost = messages;
   renderChatPreviewActions(previewActionsActive);
 
@@ -196,6 +203,8 @@ export function initChat({
   let recognition: BrowserSpeechRecognition | null = null;
   let currentRequestId: string | null = null;
   let toolStartedForCurrentRequest = false;
+  let scheduleSuggestionsPending = false;
+  let scheduleSuggestionsShown = false;
   const canceledRequestIds = new Set<string>();
   const requestCancelController = createRequestCancelDialog({
     dialog: cancelDialog,
@@ -270,6 +279,33 @@ export function initChat({
 
   function appendMessage(kind: ChatMessageKind, html: string): void {
     appendChatMessage(chatMessages, kind, html);
+  }
+
+  function closeCommandGuide(): void {
+    chatCommandGuide.hidden = true;
+    chatCommandGuideOpen.focus();
+  }
+
+  function openCommandGuide(): void {
+    chatCommandGuide.hidden = false;
+    chatCommandGuide.querySelector<HTMLButtonElement>(".command-guide__close")?.focus();
+  }
+
+  async function copyPrompt(prompt: string, button: HTMLButtonElement): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      button.textContent = "Copied";
+      window.setTimeout(() => {
+        button.textContent = "Copy";
+      }, 1000);
+    } catch {
+      chatInput.value = prompt;
+      chatInput.focus();
+      button.textContent = "Inserted";
+      window.setTimeout(() => {
+        button.textContent = "Copy";
+      }, 1000);
+    }
   }
 
   function sendUserMessage(message: string): void {
@@ -358,8 +394,51 @@ export function initChat({
     sendUserMessage(chatInput.value);
   });
 
+  chatCommandGuideOpen.addEventListener("click", () => {
+    openCommandGuide();
+  });
+
+  chatCommandGuide.addEventListener("click", (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest("[data-command-guide-close]")) {
+      closeCommandGuide();
+      return;
+    }
+
+    const copyButton = target.closest<HTMLButtonElement>(".command-guide__copy");
+
+    if (copyButton) {
+      void copyPrompt(copyButton.dataset.prompt ?? "", copyButton);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !chatCommandGuide.hidden) {
+      closeCommandGuide();
+    }
+  });
+
   chatVoice.addEventListener("click", () => {
     startVoiceInput();
+  });
+
+  chatMessages.addEventListener("click", (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const promptButton = target.closest<HTMLButtonElement>(".prompt-pill");
+
+    if (promptButton) {
+      sendUserMessage(promptButton.textContent ?? "");
+    }
   });
 
   chatMessages.addEventListener("preview-apply", () => {
@@ -416,6 +495,13 @@ export function initChat({
     setPending(false);
     currentRequestId = null;
     toolStartedForCurrentRequest = false;
+
+    if (scheduleSuggestionsPending && !scheduleSuggestionsShown) {
+      appendMessage("assistant", renderContextualSuggestions());
+      scheduleSuggestionsShown = true;
+    }
+
+    scheduleSuggestionsPending = false;
   });
 
   socket.on("tool_call", (payload: unknown, ack?: (response: unknown) => void) => {
@@ -460,6 +546,11 @@ export function initChat({
       const result = runCommand(payload.cmd, payload.params);
       const state = getSchedulerState();
       const summary = summarizeToolResult(payload.cmd, payload.params, state, result);
+
+      if (payload.cmd === "generate_schedule") {
+        scheduleSuggestionsPending = true;
+      }
+
       console.info("[scheduler-diagnostics] tool_call success", {
         toolCallId: payload.toolCallId,
         cmd: payload.cmd,

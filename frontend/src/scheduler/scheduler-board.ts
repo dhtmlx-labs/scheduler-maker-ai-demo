@@ -14,7 +14,6 @@ import "./scheduler.css";
 
 export type SchedulerZoomLevel = "day" | "3_days" | "week";
 export type SchedulerSkin = "material" | "flat" | "terrace" | "dark" | "contrast-white" | "contrast-black";
-export type SchedulerView = "timeline" | "day" | "week";
 
 const allowedSkins = new Set<SchedulerSkin>([
   "material",
@@ -269,14 +268,6 @@ export function setSchedulerDate(date: Date): void {
   }
 
   scheduler.setCurrentView(date, scheduler.getState().mode);
-}
-
-export function setSchedulerView(view: SchedulerView): void {
-  if (!["timeline", "day", "week"].includes(view)) {
-    throw new Error(`Unsupported Scheduler view: ${view}`);
-  }
-
-  scheduler.setCurrentView(scheduler.getState().date, view);
 }
 
 export function setSchedulerSkin(skin: SchedulerSkin): void {

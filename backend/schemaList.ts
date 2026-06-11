@@ -246,10 +246,6 @@ const getAvailabilityWindowsSchema = z.object({
   ),
 }).strict();
 
-const setViewSchema = z.object({
-  view: z.enum(["timeline", "day", "week"]).describe("Scheduler view to activate."),
-}).strict();
-
 const setSkinSchema = z.object({
   skin: z.enum([
     "material",
@@ -282,7 +278,6 @@ export const toolSchemasByName = {
   get_scheduler_state: getSchedulerStateSchema,
   get_availability_windows: getAvailabilityWindowsSchema,
   unschedule_appointments: unscheduleAppointmentsSchema,
-  set_view: setViewSchema,
   set_skin: setSkinSchema,
   set_zoom: setZoomSchema,
   set_date: setDateSchema,
@@ -310,8 +305,6 @@ const toolDescriptions: Record<ToolName, string> = {
     "Return read-only availability facts for a date: occupied intervals, available windows, lunch pause behavior, and optional fit/candidate end time for an estimated duration. This is diagnostic support only; it does not choose a final resource, create appointments, start previews, or mutate state.",
   unschedule_appointments:
     "Prepare a preview that moves one or more scheduled maintenance work orders back into Incoming Requests by id. Use this when the user asks to unschedule, unassign, or move a work order back to the request queue.",
-  set_view:
-    "Change the Scheduler view.",
   set_skin:
     "Change the DHTMLX Scheduler skin.",
   set_zoom:

@@ -15,7 +15,6 @@ type SchedulerController = {
   replaceScheduledItems: (items: ScheduledItem[]) => void;
   setDate: (date: Date) => void;
   setSkin: (skin: "material" | "flat" | "terrace" | "dark" | "contrast-white" | "contrast-black") => void;
-  setView: (view: "timeline" | "day" | "week") => void;
   setZoom: (level: "day" | "3_days" | "week") => void;
 };
 
@@ -67,10 +66,6 @@ type SetSkinArgs = {
   skin: "material" | "flat" | "terrace" | "dark" | "contrast-white" | "contrast-black";
 };
 
-type SetViewArgs = {
-  view: "timeline" | "day" | "week";
-};
-
 type SetZoomArgs = {
   level: "day" | "3_days" | "week";
 };
@@ -84,7 +79,6 @@ type CommandArgs =
   | ClearAllArgs
   | SetDateArgs
   | SetSkinArgs
-  | SetViewArgs
   | SetZoomArgs
   | GetAvailabilityWindowsArgs
   | Record<string, never>;
@@ -395,12 +389,6 @@ export function createCommandRunner(options: CommandRunnerOptions) {
       case "set_skin": {
         const { skin } = args as SetSkinArgs;
         options.scheduler.setSkin(skin);
-        return toResult(cmd, cloneState(options.state));
-      }
-
-      case "set_view": {
-        const { view } = args as SetViewArgs;
-        options.scheduler.setView(view);
         return toResult(cmd, cloneState(options.state));
       }
 
