@@ -5,15 +5,36 @@
   min-height: 0;
 }
 
+.chat-widget > .panel-header {
+  align-items: center;
+  border-bottom: 0;
+  background: #1f2937;
+  color: #ffffff;
+}
+
+.chat-widget > .panel-header h2 {
+  color: #ffffff;
+}
+
+.chat-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.chat-title-row h2 {
+  margin: 0;
+}
+
 .chat-status {
   flex: 0 0 auto;
-  border: 1px solid #d5dce5;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: 999px;
-  background: #f5f7fa;
-  color: #617184;
-  font-size: 0.72rem;
-  font-weight: 800;
-  padding: 6px 8px;
+  background: #efb339;
+  box-shadow: 0 0 0 3px rgba(239, 179, 57, 0.18);
 }
 
 .chat-header-actions {
@@ -23,27 +44,41 @@
 }
 
 .chat-help {
-  min-height: 30px;
-  border: 1px solid #c8d3df;
-  border-radius: 8px;
+  width: 35px;
+  height: 35px;
+  border: 1px solid #ffffff;
+  border-radius: 50%;
   background: #ffffff;
-  color: #29384d;
+  color: #000000;
   cursor: pointer;
   font: inherit;
-  font-size: 0.76rem;
-  font-weight: 800;
-  padding: 0 9px;
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .chat-help:hover {
-  border-color: #9fb0c2;
-  background: #f5f8fb;
+  background: #1f2937;
+  color: #ffffff;
 }
 
 .chat-status--connected {
-  border-color: #bfd4c4;
-  background: #e8f7ed;
-  color: #1f6b3d;
+  background: #35c46f;
+  box-shadow: 0 0 0 3px rgba(53, 196, 111, 0.18);
+}
+
+.chat-status--connecting {
+  background: #efb339;
+  box-shadow: 0 0 0 3px rgba(239, 179, 57, 0.18);
+}
+
+.chat-status--disconnected {
+  background: #e05252;
+  box-shadow: 0 0 0 3px rgba(224, 82, 82, 0.18);
 }
 
 .chat-messages {
@@ -210,20 +245,25 @@
 }
 
 .prompt-pill {
-  border: 1px solid #d4dde6;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #41556c;
+  border: 1px solid #d1e6f0;
+  border-radius: 16px;
+  background: #e9f3f8;
+  color: #0277bd;
   cursor: pointer;
   font: inherit;
-  font-size: 0.76rem;
-  font-weight: 700;
-  padding: 7px 9px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 4px 12px;
+  text-align: left;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
 }
 
 .prompt-pill:hover:not(:disabled) {
-  border-color: #9fb0c2;
-  background: #f5f8fb;
+  border-color: #d1e6f0;
+  background: #d1e6f0;
+  transform: translateY(-1px);
 }
 
 .prompt-pill:disabled {
@@ -276,12 +316,38 @@
 }
 
 .chat-voice {
+  display: inline-flex;
+  width: 38px;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #c8d3df;
   background: #ffffff;
   color: #29384d;
   cursor: pointer;
   font-weight: 800;
-  padding: 0 10px;
+  padding: 0;
+}
+
+.chat-voice-wrapper {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+}
+
+.chat-voice-wrapper:focus {
+  border-radius: 8px;
+  outline: 2px solid #0277bd;
+  outline-offset: 2px;
+}
+
+.chat-voice__icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .chat-voice:hover:not(:disabled) {
@@ -405,7 +471,7 @@
 .command-guide {
   position: fixed;
   inset: 0;
-  z-index: 25;
+  z-index: 1001;
   display: grid;
   place-items: center;
   padding: 16px;
@@ -418,20 +484,21 @@
 .command-guide__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(31, 42, 56, 0.42);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .command-guide__panel {
   position: relative;
   display: flex;
-  width: min(760px, 100%);
-  max-height: min(760px, calc(100vh - 32px));
+  width: min(700px, calc(100vw - 32px));
+  max-height: 75vh;
   flex-direction: column;
-  border: 1px solid #d6dde6;
-  border-radius: 8px;
+  border: 0;
+  border-radius: 4px;
   background: #ffffff;
-  box-shadow: 0 18px 50px rgba(31, 42, 56, 0.22);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
   overflow: hidden;
+  animation: command-guide-slide-in 0.25s cubic-bezier(0, 0, 0.2, 1);
 }
 
 .command-guide__header {
@@ -439,8 +506,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-bottom: 1px solid #e1e7ee;
-  padding: 14px 16px;
+  border-bottom: 0;
+  padding: 20px 25px 10px;
 }
 
 .command-guide__header h2,
@@ -448,41 +515,49 @@
   margin: 0;
 }
 
+.command-guide__header h2 {
+  color: #00449e;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
 .command-guide__close,
 .command-guide__copy {
-  min-height: 32px;
-  border: 1px solid #a8bbc9;
+  min-height: 30px;
+  border: 1px solid #efefef;
   border-radius: 8px;
-  background: #ffffff;
-  color: #29384d;
+  background: #efefef;
+  color: #000000;
   cursor: pointer;
   font: inherit;
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 500;
   padding: 0 10px;
+  transition: background-color 0.2s;
 }
 
 .command-guide__close:hover,
 .command-guide__copy:hover {
-  background: #f5f8fb;
+  background: #e2e2e2;
 }
 
 .command-guide__body {
   overflow-y: auto;
-  padding: 14px 16px 16px;
+  padding: 10px 25px 25px;
+  line-height: 1.5;
 }
 
 .command-guide__intro {
-  border: 1px solid #dbe4ee;
-  border-radius: 8px;
-  background: #f7f9fc;
-  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .command-guide__intro p {
   margin: 0;
-  color: #41556c;
-  font-size: 0.84rem;
+  color: rgba(0, 0, 0, 0.78);
+  font-size: 0.9rem;
   line-height: 1.45;
 }
 
@@ -493,20 +568,45 @@
 .command-guide__intro code,
 .command-guide__item code {
   border-radius: 5px;
-  background: #eef2f6;
-  color: #263548;
+  background: #f3f3f3;
+  color: rgba(0, 0, 0, 0.8);
   font-size: 0.78rem;
   padding: 2px 4px;
 }
 
+.command-guide__nav {
+  margin: 16px 0 0;
+}
+
+.command-guide__nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 15px;
+}
+
+.command-guide__nav a {
+  color: #007bff;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.command-guide__nav a:hover {
+  text-decoration: underline;
+}
+
 .command-guide__section {
-  margin-top: 16px;
+  margin-top: 28px;
 }
 
 .command-guide__section h3 {
-  margin: 0 0 8px;
-  color: #1e2b3d;
+  margin: 0 0 12px;
+  border-bottom: 1px solid #cccccc;
+  color: rgba(0, 0, 0, 0.82);
   font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .command-guide__items {
@@ -519,19 +619,19 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
-  border: 1px solid #dbe4ee;
-  border-radius: 8px;
-  padding: 10px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
 }
 
 .command-guide__item strong {
   display: inline-flex;
   width: fit-content;
-  border-radius: 999px;
-  background: #eef2f6;
-  color: #41556c;
-  font-size: 0.72rem;
-  padding: 4px 7px;
+  border-radius: 0;
+  background: transparent;
+  color: #00449e;
+  font-size: 0.9rem;
+  padding: 0;
 }
 
 .command-guide__item h4,
@@ -541,15 +641,27 @@
 
 .command-guide__item h4 {
   margin-top: 7px;
-  color: #1e2b3d;
+  color: rgba(0, 0, 0, 0.86);
   font-size: 0.9rem;
 }
 
 .command-guide__item p {
   margin-top: 4px;
-  color: #506174;
+  color: rgba(0, 0, 0, 0.72);
   font-size: 0.82rem;
   line-height: 1.4;
+}
+
+@keyframes command-guide-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .command-guide__item code {

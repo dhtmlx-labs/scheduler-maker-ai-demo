@@ -143,6 +143,13 @@ export function renderCommandGuideModal(): string {
             <p>Use chat to inspect the Scheduler, prepare previews, adjust the visible Timeline, and manage Incoming Requests.</p>
             <p>Incoming Requests are unscheduled cards outside DHTMLX Scheduler. Drag a card into the Timeline to schedule it manually, or ask the assistant to prepare a preview. Scheduled work orders can also be moved back to Incoming Requests with <code>unschedule_appointments</code>.</p>
           </section>
+          <nav class="command-guide__nav" aria-label="Command guide sections">
+            <ul>
+              ${commandGuideSections.map((section) => `
+                <li><a href="#command-guide-${sanitizeText(section.id)}">${sanitizeText(section.title)}</a></li>
+              `).join("")}
+            </ul>
+          </nav>
           ${commandGuideSections.map((section) => `
             <section class="command-guide__section" id="command-guide-${sanitizeText(section.id)}">
               <h3>${sanitizeText(section.title)}</h3>

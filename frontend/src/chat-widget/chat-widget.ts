@@ -128,13 +128,17 @@ export function initChat({
   container.innerHTML = `
     <div class="chat-widget">
       <div class="panel-header">
-        <div>
-          <p class="eyebrow">AI Assistant</p>
-          <h2>Facilities Chat</h2>
+        <div class="chat-title-row">
+          <h2>DHX Assistant</h2>
+          <span
+            id="chat_connection_status"
+            class="chat-status chat-status--connecting"
+            title="Connecting"
+            aria-label="Connection status: Connecting"
+          ></span>
         </div>
         <div class="chat-header-actions">
-          <button id="chat_command_guide_open" class="chat-help" type="button" aria-haspopup="dialog">Guide</button>
-          <span id="chat_connection_status" class="chat-status">Connecting</span>
+          <button id="chat_command_guide_open" class="chat-help" type="button" aria-haspopup="dialog" aria-label="Open command guide">?</button>
         </div>
       </div>
       <div id="chat_messages" class="chat-messages" aria-live="polite"></div>
@@ -147,7 +151,16 @@ export function initChat({
       </div>
       <form id="chat_form" class="chat-form">
         <input id="chat_input" class="chat-input" type="text" autocomplete="off" placeholder="Ask the facilities assistant..." />
-        <button id="chat_voice" class="chat-voice" type="button" aria-label="Dictate message" title="Dictate message">Mic</button>
+        <span id="chat_voice_wrapper" class="chat-voice-wrapper">
+          <button id="chat_voice" class="chat-voice" type="button" aria-label="Dictate message" title="Dictate message">
+            <svg class="chat-voice__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z"></path>
+              <path d="M19 11a7 7 0 0 1-14 0"></path>
+              <path d="M12 18v4"></path>
+              <path d="M8 22h8"></path>
+            </svg>
+          </button>
+        </span>
         <button id="chat_submit" class="chat-submit" type="submit">Send</button>
       </form>
       <div id="chat_voice_status" class="chat-voice-status" aria-live="polite"></div>
@@ -172,6 +185,7 @@ export function initChat({
   const loader = container.querySelector<HTMLElement>("#chat_loader");
   const form = container.querySelector<HTMLFormElement>("#chat_form");
   const input = container.querySelector<HTMLInputElement>("#chat_input");
+  const voiceWrapper = container.querySelector<HTMLElement>("#chat_voice_wrapper");
   const voice = container.querySelector<HTMLButtonElement>("#chat_voice");
   const voiceStatus = container.querySelector<HTMLElement>("#chat_voice_status");
   const submit = container.querySelector<HTMLButtonElement>("#chat_submit");
@@ -182,7 +196,7 @@ export function initChat({
   const cancelStop = container.querySelector<HTMLButtonElement>("#chat_cancel_stop");
   const promptButtons = Array.from(container.querySelectorAll<HTMLButtonElement>(".prompt-pill"));
 
-  if (!messages || !loader || !form || !input || !submit || !voice || !voiceStatus || !cancelDialog || !cancelTitle || !cancelBody || !cancelContinue || !cancelStop || !commandGuideOpen || !commandGuide) {
+  if (!messages || !loader || !form || !input || !submit || !voiceWrapper || !voice || !voiceStatus || !cancelDialog || !cancelTitle || !cancelBody || !cancelContinue || !cancelStop || !commandGuideOpen || !commandGuide) {
     return;
   }
 
@@ -198,6 +212,7 @@ export function initChat({
   const chatVoice = voice;
   const chatVoiceStatus = voiceStatus;
   const SpeechRecognition = getSpeechRecognitionConstructor();
+  const voiceSupported = Boolean(SpeechRecognition);
   let pending = false;
   let listening = false;
   let recognition: BrowserSpeechRecognition | null = null;
@@ -224,7 +239,7 @@ export function initChat({
     chatSubmit.disabled = false;
     chatSubmit.textContent = nextPending ? "Cancel" : "Send";
     chatSubmit.classList.toggle("chat-submit--cancel", nextPending);
-    chatVoice.disabled = nextPending || listening;
+    chatVoice.disabled = !voiceSupported || nextPending || listening;
     renderChatPreviewActions(previewActionsActive);
     promptButtons.forEach((button) => {
       button.disabled = nextPending;
@@ -258,9 +273,10 @@ export function initChat({
 
   function setListening(nextListening: boolean): void {
     listening = nextListening;
-    chatVoice.disabled = pending || nextListening;
+    chatVoice.disabled = !voiceSupported || pending || nextListening;
     chatVoice.classList.toggle("chat-voice--listening", nextListening);
-    chatVoice.textContent = nextListening ? "Listening" : "Mic";
+    chatVoice.title = nextListening ? "Listening" : "Dictate message";
+    chatVoice.setAttribute("aria-label", nextListening ? "Listening" : "Dictate message");
   }
 
   function setVoiceStatus(message: string): void {
@@ -273,8 +289,11 @@ export function initChat({
       return;
     }
 
-    status.textContent = label;
+    status.title = label;
+    status.setAttribute("aria-label", `Connection status: ${label}`);
     status.classList.toggle("chat-status--connected", connected);
+    status.classList.toggle("chat-status--connecting", !connected && label === "Connecting");
+    status.classList.toggle("chat-status--disconnected", !connected && label !== "Connecting");
   }
 
   function appendMessage(kind: ChatMessageKind, html: string): void {
@@ -392,6 +411,28 @@ export function initChat({
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     sendUserMessage(chatInput.value);
+  });
+
+  if (!voiceSupported) {
+    chatVoice.disabled = true;
+    chatVoice.title = "Voice input is not supported in this browser";
+    chatVoice.setAttribute("aria-label", "Voice input is not supported in this browser");
+    voiceWrapper.title = "Voice input is not supported in this browser.";
+    voiceWrapper.tabIndex = 0;
+    voiceWrapper.setAttribute("aria-label", "Voice input is not supported in this browser.");
+  }
+
+  voiceWrapper.addEventListener("click", () => {
+    if (!voiceSupported) {
+      setVoiceStatus("Voice input is not supported in this browser. Typed chat still works.");
+    }
+  });
+
+  voiceWrapper.addEventListener("keydown", (event) => {
+    if (!voiceSupported && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      setVoiceStatus("Voice input is not supported in this browser. Typed chat still works.");
+    }
   });
 
   chatCommandGuideOpen.addEventListener("click", () => {
