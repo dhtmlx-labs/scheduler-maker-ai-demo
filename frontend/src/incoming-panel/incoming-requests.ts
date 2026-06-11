@@ -1,5 +1,6 @@
 import "./incoming-requests.css";
 import type { UnscheduledPreviewItem } from "../preview/preview-session.ts";
+import { getWorkTypeIcon } from "../scheduler/work-type-icons.ts";
 
 let dragDisabled = false;
 
@@ -46,6 +47,7 @@ function getPreviewLabel(item: UnscheduledPreviewItem): string {
 
 function renderRequestCard(item: UnscheduledPreviewItem): string {
   const previewLabel = getPreviewLabel(item);
+  const workTypeIcon = getWorkTypeIcon(item.work_type);
   const className = [
     "incoming-card",
     item.preview_kind ? "incoming-card--preview" : "",
@@ -78,7 +80,10 @@ function renderRequestCard(item: UnscheduledPreviewItem): string {
       <dl>
         <div>
           <dt>Work</dt>
-          <dd>${escapeHtml(item.work_type)}</dd>
+          <dd>
+            <span class="incoming-card__work-type-icon" aria-hidden="true">${escapeHtml(workTypeIcon)}</span>
+            <span>${escapeHtml(item.work_type)}</span>
+          </dd>
         </div>
         <div>
           <dt>Issue</dt>

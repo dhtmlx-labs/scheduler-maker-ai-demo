@@ -4,6 +4,7 @@ import { scheduler } from "@dhx/trial-scheduler";
 
 import { appState } from "../app-state.ts";
 import { formatSchedulerDate } from "./scheduler-utils.ts";
+import { getResourceCapabilityIcons } from "./work-type-icons.ts";
 
 import type { Resource, ScheduledItem, SchedulerItemId } from "./types.ts";
 import { demoDate, resources, seedScheduledItems } from "./data.ts";
@@ -181,7 +182,10 @@ function configureScheduler(): void {
   scheduler.templates.timeline_scale_label = (_key, _label, section: Resource) => `
     <div class="resource-label">
       <strong>${escapeHtml(section.name)}</strong>
-      <span>${escapeHtml(section.description)}</span>
+      <span class="resource-label__specialization">
+        <span class="resource-label__icons" aria-hidden="true">${getResourceCapabilityIcons(section.description).map(escapeHtml).join(" ")}</span>
+        ${escapeHtml(section.description)}
+      </span>
     </div>
   `;
 

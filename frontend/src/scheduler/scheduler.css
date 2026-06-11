@@ -31,6 +31,16 @@
   line-height: 1.25;
 }
 
+.resource-label__specialization {
+  display: block;
+}
+
+.resource-label__icons {
+  display: inline;
+  margin-right: 5px;
+  white-space: nowrap;
+}
+
 .service-event {
   display: flex;
   flex-direction: column;
