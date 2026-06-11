@@ -271,27 +271,6 @@
   opacity: 0.55;
 }
 
-.chat-suggestions {
-  max-width: min(88%, 420px);
-  border: 1px solid #d4dde6;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 10px;
-}
-
-.chat-suggestions p {
-  margin: 0 0 8px;
-  color: #41556c;
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.chat-suggestions__pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
 .chat-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

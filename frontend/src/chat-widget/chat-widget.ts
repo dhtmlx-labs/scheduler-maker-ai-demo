@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io-client";
 
 import type { CommandResult, SchedulerState } from "../scheduler/types.ts";
-import { renderCommandGuideModal, renderContextualSuggestions, renderPromptButtons } from "./command-guide.ts";
+import { renderCommandGuideModal, renderPromptButtons } from "./command-guide.ts";
 import { appendChatMessage, renderMarkdown, sanitizeText, type ChatMessageKind } from "./message-rendering.ts";
 import { createRequestCancelDialog } from "./request-cancel-dialog.ts";
 import { getSpeechRecognitionConstructor, type BrowserSpeechRecognition } from "./speech-recognition.ts";
@@ -218,8 +218,6 @@ export function initChat({
   let recognition: BrowserSpeechRecognition | null = null;
   let currentRequestId: string | null = null;
   let toolStartedForCurrentRequest = false;
-  let scheduleSuggestionsPending = false;
-  let scheduleSuggestionsShown = false;
   const canceledRequestIds = new Set<string>();
   const requestCancelController = createRequestCancelDialog({
     dialog: cancelDialog,
@@ -536,13 +534,6 @@ export function initChat({
     setPending(false);
     currentRequestId = null;
     toolStartedForCurrentRequest = false;
-
-    if (scheduleSuggestionsPending && !scheduleSuggestionsShown) {
-      appendMessage("assistant", renderContextualSuggestions());
-      scheduleSuggestionsShown = true;
-    }
-
-    scheduleSuggestionsPending = false;
   });
 
   socket.on("tool_call", (payload: unknown, ack?: (response: unknown) => void) => {
@@ -587,10 +578,6 @@ export function initChat({
       const result = runCommand(payload.cmd, payload.params);
       const state = getSchedulerState();
       const summary = summarizeToolResult(payload.cmd, payload.params, state, result);
-
-      if (payload.cmd === "generate_schedule") {
-        scheduleSuggestionsPending = true;
-      }
 
       console.info("[scheduler-diagnostics] tool_call success", {
         toolCallId: payload.toolCallId,

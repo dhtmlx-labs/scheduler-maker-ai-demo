@@ -13,15 +13,6 @@ type CommandGuideSection = {
   items: CommandGuideItem[];
 };
 
-export const contextualSchedulePrompts = [
-  "Move the emergency exit light work order to Nina later today.",
-  "Find a free slot for the lobby spill cleanup.",
-  "Mark the parking level fixture repair as ready.",
-  "Move the access card enrollment work order back to Incoming Requests.",
-  "Switch to week view.",
-  "Use the dark skin.",
-];
-
 export const commandGuideSections: CommandGuideSection[] = [
   {
     id: "planning",
@@ -113,17 +104,6 @@ export function renderPromptButtons(prompts: string[]): string {
   return prompts
     .map((prompt) => `<button class="prompt-pill" type="button">${sanitizeText(prompt)}</button>`)
     .join("");
-}
-
-export function renderContextualSuggestions(): string {
-  return `
-    <div class="chat-suggestions">
-      <p>Next useful commands:</p>
-      <div class="chat-suggestions__pills">
-        ${renderPromptButtons(contextualSchedulePrompts)}
-      </div>
-    </div>
-  `;
 }
 
 export function renderCommandGuideModal(): string {
