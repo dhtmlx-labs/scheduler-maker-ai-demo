@@ -378,12 +378,12 @@ io.on("connection", (socket) => {
                   unscheduledIds: getStateIds(result.data, "unscheduledItems"),
                 });
 
-                if (duplicateCount >= 2 && hasActivePreview(result.data)) {
+                if (hasActivePreview(result.data)) {
                   saveMessage(socket.id, {
                     role: "system",
-                    content: `generate_schedule already failed repeatedly because id ${duplicateId} is scheduled in the active preview. Stop calling tools and produce the final preview response from the latest state data.`,
+                    content: `generate_schedule failed because id ${duplicateId} is already included in the active preview. Do not call generate_schedule again for id ${duplicateId}. Produce the final preview summary from the latest preview-aware state data.`,
                   });
-                  await emitFinalAssistantFromHistory("duplicate generate_schedule retry guard", turn);
+                  await emitFinalAssistantFromHistory("duplicate generate_schedule active-preview recovery", turn);
                   return;
                 }
               }

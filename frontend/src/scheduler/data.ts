@@ -31,8 +31,8 @@ export const resources: Resource[] = [
   {
     key: "marek",
     name: "Marek Nowak",
-    label: "Marek Nowak - Plumbing and repairs",
-    description: "Plumbing and repairs",
+    label: "Marek Nowak - Plumbing and cleaning",
+    description: "Plumbing and cleaning",
   },
   {
     key: "sofia",
